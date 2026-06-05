@@ -1,0 +1,161 @@
+#include <Wire.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BME280.h>
+#include "ScioSense_ENS160.h"
+#include <PTSolns_AHTx.h>
+#include "bsec.h"
+
+#define BME280_ADDR 0x77      // Change to 0x76 if needed
+#define SEA_LEVEL_HPA 1017.5
+#define SERIAL_BAUD 115200
+#define LOG_PERIOD_MS 3000
+Adafruit_BME280 bme280;
+ScioSense_ENS160 ens160(ENS160_I2CADDR_0);
+PTSolns_AHTx aht;
+Bsec bme;
+
+bool ens_ok = false;
+bool aht_ok = false;
+
+void setup(){
+  Serial.begin(115200);
+  delay(2000);
+  Wire.begin();
+  //BME 280 initialization
+  Serial.println("BOOT,BME280_TEST");
+  if (!bme280.begin(BME280_ADDR)) {
+    Serial.println("ERROR,BME280_NOT_FOUND");
+    while (1);
+  }
+
+   // AHT21
+  aht_ok = aht.begin();
+
+  Serial.print("BOOT,AHT21,");
+  Serial.println(aht_ok ? "OK" : "FAILED");
+
+  // ENS160
+  ens160.begin();
+
+  ens_ok = ens160.available();
+
+  if (ens_ok) {
+    ens_ok = ens160.setMode(ENS160_OPMODE_STD);
+  }
+
+  Serial.print("BOOT,ENS160,");
+  Serial.println(ens_ok ? "OK" : "FAILED");
+
+  bme.begin(BME68X_I2C_ADDR_LOW, Wire);
+
+  checkBsecStatus();
+
+  bsec_virtual_sensor_t sensorList[] = {
+    BSEC_OUTPUT_IAQ,
+    BSEC_OUTPUT_CO2_EQUIVALENT,
+    BSEC_OUTPUT_BREATH_VOC_EQUIVALENT,
+    BSEC_OUTPUT_SENSOR_HEAT_COMPENSATED_TEMPERATURE,
+    BSEC_OUTPUT_SENSOR_HEAT_COMPENSATED_HUMIDITY,
+    BSEC_OUTPUT_RAW_PRESSURE,
+    BSEC_OUTPUT_RAW_GAS
+  };
+
+  bme.updateSubscription(
+    sensorList,
+    sizeof(sensorList) / sizeof(sensorList[0]),
+    BSEC_SAMPLE_RATE_LP
+  );
+
+  checkBsecStatus();
+
+  Serial.println(
+    "HEADER,Millis,IAQ,Accuracy,Temperature_C,Humidity_Percent,CO2_ppm,VOC,Pressure_hPa,Gas_Ohms,Temperature_C,Humidity_Percent,Pressure_hPa,Altitude_m,AQI,TVOC_ppb,eCO2_ppm,HP0_Ohms,HP1_Ohms,HP2_Ohms,HP3_Ohms,AHT21_Temp_C,AHT21_Humidity_Percent"
+  );
+
+}
+
+void loop(){
+
+    if (bme.run()) {
+
+      Serial.print("DATA,TIME,");
+
+      Serial.print(millis());
+      Serial.print(",");
+
+      Serial.print(bme.iaq, 2);
+      Serial.print(",");
+
+      Serial.print(bme.iaqAccuracy);
+      Serial.print(",");
+
+      Serial.print(bme.temperature, 2);
+      Serial.print(",");
+
+      Serial.print(bme.humidity, 2);
+      Serial.print(",");
+
+      Serial.print(bme.co2Equivalent, 2);
+      Serial.print(",");
+
+      Serial.print(bme.breathVocEquivalent, 2);
+      Serial.print(",");
+
+      Serial.print(bme.pressure / 100.0, 2);
+      Serial.print(",");
+      Serial.print(bme.gasResistance, 0);
+      Serial.print(",");
+  }
+  else {
+    checkBsecStatus();
+  }
+
+  Serial.print(bme280.readTemperature(), 2);
+  Serial.print(",");
+
+  Serial.print(bme280.readHumidity(), 2);
+  Serial.print(",");
+
+  Serial.print(bme280.readPressure() / 100.0F, 2);
+  Serial.print(",");
+
+  Serial.print(bme280.readAltitude(SEA_LEVEL_HPA), 2);
+  Serial.print(",");
+
+  float temp =  0;
+  float hum = 0;
+  
+  if (ens160.available()) {
+    ens160.measure(true);
+    ens160.measureRaw(true);
+  
+    Serial.print(ens160.getAQI());Serial.print(",");
+    Serial.print(ens160.getTVOC());Serial.print(",");
+    Serial.print(ens160.geteCO2());Serial.print(",");
+    Serial.print(ens160.getHP0());Serial.print(",");
+    Serial.print(ens160.getHP1());Serial.print(",");
+    Serial.print(ens160.getHP2());Serial.print(",");
+    Serial.print(ens160.getHP3());Serial.print(",");
+  }
+  if (aht_ok) {
+    aht.readTemperatureHumidity(temp, hum, 120);
+    Serial.print(temp,2);Serial.print(",");
+    Serial.println(hum,2);
+  }
+  ens160.set_envdata(temp, hum);
+  delay(LOG_PERIOD_MS);
+}
+
+
+void checkBsecStatus() {
+
+  if (bme.bsecStatus < BSEC_OK) {
+    Serial.print("ERROR,BSEC,");
+    Serial.println(bme.bsecStatus);
+  }
+
+  if (bme.bme68xStatus < BME68X_OK) {
+    Serial.print("ERROR,BME68X,");
+    Serial.println(bme.bme68xStatus);
+  }
+}
