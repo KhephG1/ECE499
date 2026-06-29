@@ -20,6 +20,7 @@
 #include "main.h"
 #include "dcache.h"
 #include "icache.h"
+#include "scd40.h"
 #include "stm32u5xx_hal.h"
 #include "uart_logs.h"
 #include "usart.h"
@@ -28,6 +29,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "scd40_driver.h"
+#include <stdint.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -60,7 +62,8 @@ static void SystemPower_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+//struct for the scd40 sensor
+scd4x_handle_t scd40;
 /* USER CODE END 0 */
 
 /**
@@ -101,7 +104,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
   //initialize the scd40
   
-  if(!init_scd40(&scd40, 0, 0.0,0.0)){
+  if(init_scd40(&scd40, 0, 0.0,0.0) != 0){
     Error_Handler();
   }
   /* USER CODE END 2 */
@@ -113,10 +116,12 @@ int main(void)
     /* USER CODE END WHILE */
     
     /* USER CODE BEGIN 3 */
-   if(!scd4x_basic_read(&scd40)){
+
+   HAL_Delay(SCD40_SAMPLE_PERIOD_MS);
+   uint8_t status = scd4x_basic_read(&scd40); 
+   if(status != 0 && status != 5){
     Error_Handler();
    }
-   HAL_Delay(SCD40_SAMPLE_PERIOD_MS);
   }
   /* USER CODE END 3 */
 }

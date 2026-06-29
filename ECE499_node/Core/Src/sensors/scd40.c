@@ -355,20 +355,20 @@ uint8_t scd4x_read(scd4x_handle_t *handle, uint16_t *co2_raw, uint16_t *co2_ppm,
     res = a_scd4x_iic_read(handle, SCD4X_COMMAND_GET_DATA_READY_STATUS, buf, 3, 1);       /* read config */
     if (res != 0)                                                                         /* check result */
     {
-        handle->debug_print("scd4x: get data ready status failed.\n");                    /* get data ready status failed */
+        handle->debug_print("scd4x: get data ready status failed.\r\n");                    /* get data ready status failed */
        
         return 1;                                                                         /* return error */
     }
     if (buf[2] != a_scd4x_generate_crc(&buf[0], 2))                                       /* check crc */
     {
-        handle->debug_print("scd4x: crc is error.\n");                                    /* crc is error */
+        handle->debug_print("scd4x: crc is error.\r\n");                                    /* crc is error */
        
         return 4;                                                                         /* return error */
     }
     prev = (uint16_t)(((uint16_t)buf[0]) << 8) | buf[1];                                  /* set prev */
     if ((prev & 0x0FFF) == 0)                                                             /* check data */
     {
-        handle->debug_print("scd4x: data is not ready.\n");                               /* data is not ready */
+        handle->debug_print("scd4x: data is not ready.\r\n");                               /* data is not ready */
        
         return 5;                                                                         /* return error */
     }

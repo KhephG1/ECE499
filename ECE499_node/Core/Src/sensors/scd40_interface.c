@@ -77,7 +77,7 @@ uint8_t scd4x_interface_iic_deinit(void)
  */
 uint8_t scd4x_interface_iic_write_cmd(uint8_t addr, uint8_t *buf, uint16_t len)
 {
-    return HAL_I2C_Master_Transmit(&hi2c1, addr, buf, len, 0);
+    return HAL_I2C_Master_Transmit(&hi2c1, addr, buf, len, 1000);
 }
 
 /**
@@ -92,7 +92,7 @@ uint8_t scd4x_interface_iic_write_cmd(uint8_t addr, uint8_t *buf, uint16_t len)
  */
 uint8_t scd4x_interface_iic_read_cmd(uint8_t addr, uint8_t *buf, uint16_t len)
 {
-    return HAL_I2C_Master_Receive(&hi2c1, addr, buf, len, 0);
+    return HAL_I2C_Master_Receive(&hi2c1, addr, buf, len, 1000);
 }
 
 /**
@@ -114,6 +114,6 @@ void scd4x_interface_debug_print(const char *const fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
-    log_debug(fmt,args);
+    vlog_debug(fmt,args);
     va_end(args);
 }

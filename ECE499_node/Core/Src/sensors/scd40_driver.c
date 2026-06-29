@@ -1,13 +1,13 @@
 #include "scd40_driver.h"
 #include "scd40.h"
 #include "scd40_interface.h"
+#include "uart_logs.h"
 #include <stdint.h>
-
 #define SCD40_BUF_SIZE (100)
 
-int scd40_CO2_buf[SCD40_CO2_BUF_SIZE] = {};
-float scd40_hum_buf[SCD40_HUM_BUF_SIZE] = {};
-float scd40_temp_buf[SCD40_TEMP_BUF_SIZE] = {};
+uint16_t scd40_CO2_buf[SCD40_BUF_SIZE] = {};
+float scd40_hum_buf[SCD40_BUF_SIZE] = {};
+float scd40_temp_buf[SCD40_BUF_SIZE] = {};
 
 uint8_t init_scd40(scd4x_handle_t *gs_handle, scd4x_t type, float cal_pressure, float cal_temp) {
     uint8_t result;
@@ -19,9 +19,9 @@ uint8_t init_scd40(scd4x_handle_t *gs_handle, scd4x_t type, float cal_pressure, 
     DRIVER_SCD4X_LINK_DELAY_MS(gs_handle, scd4x_interface_delay_ms);
     DRIVER_SCD4X_LINK_DEBUG_PRINT(gs_handle, scd4x_interface_debug_print);
     result = scd4x_set_type(gs_handle, type);
-        if (res != 0)
+    if (result != 0)
     {
-        scd4x_interface_debug_print("scd4x: set type failed.\n");
+        scd4x_interface_debug_print("scd4x: set type failed.\r\n");
     
         return 1;
     }
@@ -30,15 +30,15 @@ uint8_t init_scd40(scd4x_handle_t *gs_handle, scd4x_t type, float cal_pressure, 
     result = scd4x_init(gs_handle);
     if (result != 0)
     {
-        scd4x_interface_debug_print("scd4x: init failed.\n");
+        scd4x_interface_debug_print("scd4x: init failed.\r\n");
         
         return 1;
     }
     
     /* start */
-    scd4x_perform_self_test(gs_handle, (bool*)(&result));
-    if(result != 0){
-        scd4x_interface_debug_print("scd4x: self test failed.\n");
+    scd4x_perform_self_test(gs_handle, &result);
+    if(result){
+        scd4x_interface_debug_print("scd4x: self test failed.\r\n");
     }
     //calibrate for temperature and pressure
     uint16_t pressure_reg = 0;
@@ -72,15 +72,20 @@ uint8_t scd4x_basic_read(scd4x_handle_t *gs_handle)
     uint16_t humidity_raw;
     
     /* read data */
-    res = scd4x_read(gs_handle, &co2_raw, scd40_CO2_buf[num_readings],
-                     &temperature_raw, scd40_temp_buf[num_readings],
-                     &humidity_raw, scd40_hum_buf[num_readings]);
+    res = scd4x_read(gs_handle, &co2_raw, &scd40_CO2_buf[num_readings],
+                     &temperature_raw, &scd40_temp_buf[num_readings],
+                     &humidity_raw, &scd40_hum_buf[num_readings]);
     if (res != 0)
     {
-        return 1;
+        return res;
     }
-    
-    gs_handle->debug_print("%d %02f %02f\n", scd40_CO2_buf[num_readings], scd40_temp_buf[num_readings], scd40_hum_buf[num_readings]);
+    char co2[20] = {};
+    char temp[20] = {};
+    char hum[20] = {};
+    intToStr( (int)scd40_CO2_buf[num_readings], co2,3 );
+    my_ftoa(scd40_temp_buf[num_readings],temp,3);
+    my_ftoa(scd40_hum_buf[num_readings],hum,3);
+    gs_handle->debug_print(" %s , %s , %s \r\n",co2,temp,hum);
     num_readings++;
     if(num_readings >= SCD40_BUF_SIZE){
         num_readings = 0;
@@ -88,7 +93,7 @@ uint8_t scd4x_basic_read(scd4x_handle_t *gs_handle)
     return 0;
 }
 
-int* get_scd40_CO2_readings(){
+uint16_t* get_scd40_CO2_readings(){
     return scd40_CO2_buf;
 }
 float* get_scd40_temp_readings(){
