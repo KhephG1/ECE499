@@ -1,4 +1,4 @@
-#include "UART_logs.h"
+#include "uart_logs.h"
 #include <stdarg.h>
 #include <stdio.h>
 #include "usart.h"
@@ -27,7 +27,7 @@ void log_debug(const char* message, ...) {
         va_start(args, message);
         int bytes_written = vsnprintf(buf, MAX_LOG_MSG, message, args);
         va_end(args);
-        HAL_UART_Transmit(&hlpuart1, (uint8_t*)buf, bytes_written,HAL_MAX_DELAY);
+        HAL_UART_Transmit(&huart1, (uint8_t*)buf, bytes_written,HAL_MAX_DELAY);
     }
 }
 
@@ -38,7 +38,7 @@ void log_info(const char* message, ...) {
         va_start(args, message);
         int bytes_written = vsnprintf(buf, MAX_LOG_MSG, message, args);
         va_end(args);
-        HAL_UART_Transmit(&hlpuart1, (uint8_t*)buf, bytes_written,HAL_MAX_DELAY);
+        HAL_UART_Transmit(&huart1, (uint8_t*)buf, bytes_written,HAL_MAX_DELAY);
     }
 }
 
@@ -49,7 +49,7 @@ void log_error(const char* message, ...) {
         va_start(args, message);
         int bytes_written = vsnprintf(buf, MAX_LOG_MSG, message, args);
         va_end(args);
-        HAL_UART_Transmit(&hlpuart1, (uint8_t*)buf, bytes_written,HAL_MAX_DELAY);
+        HAL_UART_Transmit(&huart1, (uint8_t*)buf, bytes_written,HAL_MAX_DELAY);
     }
 }
 

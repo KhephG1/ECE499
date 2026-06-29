@@ -1,3 +1,5 @@
 build
 mx.scratch
 !.settings
+Core/Src/Backup/
+Core/Inc/Backup/

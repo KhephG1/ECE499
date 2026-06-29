@@ -37,7 +37,7 @@
 #ifndef DRIVER_SCD4X_INTERFACE_H
 #define DRIVER_SCD4X_INTERFACE_H
 
-#include "driver_scd4x.h"
+#include "scd40.h"
 
 #ifdef __cplusplus
 extern "C"{

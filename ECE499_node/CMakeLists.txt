@@ -41,15 +41,19 @@ add_subdirectory(cmake/stm32cubemx)
 target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined library search paths
 )
-
+file(GLOB_RECURSE SENSOR_SOURCES CONFIGURE_DEPENDS "Core/Src/sensors/*.c")
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
+    ${SENSOR_SOURCES}
+    Core/Src/uart_logs.c
 )
 
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined include paths
+    Core/Inc/sensors/
+    Core/Inc/uart_logs.h
 )
 
 # Add project symbols (macros)

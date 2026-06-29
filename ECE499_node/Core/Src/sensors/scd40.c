@@ -34,7 +34,7 @@
  * </table>
  */
 
-#include "driver_scd4x.h"
+#include "scd40.h"
 
 /**
  * @brief chip information definition
