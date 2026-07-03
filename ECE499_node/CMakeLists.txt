@@ -33,6 +33,21 @@ enable_language(C ASM)
 
 # Create an executable object type
 add_executable(${CMAKE_PROJECT_NAME})
+#BSEC
+add_library(BSEC STATIC IMPORTED)
+
+set_target_properties(BSEC PROPERTIES
+    IMPORTED_LOCATION ${PROJECT_SOURCE_DIR}/third_party/bsec/bin/libalgobsec.a
+)
+
+target_include_directories(BSEC INTERFACE
+    ${PROJECT_SOURCE_DIR}/third_party/bsec/inc
+    ${PROJECT_SOURCE_DIR}/third_party/bsec/config
+)
+
+target_sources(${CMAKE_PROJECT_NAME} PRIVATE
+    ${PROJECT_SOURCE_DIR}/third_party/bsec/config/bsec_iaq.c
+)
 
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
@@ -53,20 +68,19 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined include paths
     Core/Inc/sensors/
-    Core/Inc/uart_logs.h
 )
 
 # Add project symbols (macros)
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined symbols
 )
-
 # Remove wrong libob.a library dependency when using cpp files
 list(REMOVE_ITEM CMAKE_C_IMPLICIT_LINK_LIBRARIES ob)
 
 # Add linked libraries
 target_link_libraries(${CMAKE_PROJECT_NAME}
     stm32cubemx
-
+     BSEC #bosh bsec binary
+     m #math.h
     # Add user defined libraries
 )
