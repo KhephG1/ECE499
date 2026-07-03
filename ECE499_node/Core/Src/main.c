@@ -29,6 +29,10 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "scd40_driver.h"
+#include "bme680_defs.h"
+#include "bme680_driver.h"
+#include "i2c.h"
+#include <bsec_datatypes.h>
 #include <stdint.h>
 /* USER CODE END Includes */
 
@@ -63,7 +67,10 @@ static void SystemPower_Config(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 //struct for the scd40 sensor
-scd4x_handle_t scd40;
+scd4x_handle_t scd40 = {};
+struct bme68x_dev bme680 = {};
+bsec_output_t bme680_data[6] = {};
+uint8_t noutputs = 6;
 /* USER CODE END 0 */
 
 /**
@@ -84,6 +91,7 @@ int main(void)
 
   /* USER CODE BEGIN Init */
 
+  dwt_delay_init();
   /* USER CODE END Init */
 
   /* Configure the System Power */
@@ -101,10 +109,15 @@ int main(void)
   MX_DCACHE1_Init();
   MX_ICACHE_Init();
   MX_USART1_UART_Init();
+  MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
   //initialize the scd40
   
   if(init_scd40(&scd40, 0, 0.0,0.0) != 0){
+    Error_Handler();
+  }
+  HAL_Delay(100);
+  if(bme680_init(&bme680, BME68X_I2C_INTF) != BSEC_OK){
     Error_Handler();
   }
   /* USER CODE END 2 */
@@ -116,12 +129,9 @@ int main(void)
     /* USER CODE END WHILE */
     
     /* USER CODE BEGIN 3 */
-
-   HAL_Delay(SCD40_SAMPLE_PERIOD_MS);
-   uint8_t status = scd4x_basic_read(&scd40); 
-   if(status != 0 && status != 5){
-    Error_Handler();
-   }
+   HAL_Delay(100); 
+   int8_t bme_status = bme680_step(&bme680, bme680_data, &noutputs);
+   uint8_t scd_status = scd4x_basic_read(&scd40); 
   }
   /* USER CODE END 3 */
 }
@@ -175,7 +185,7 @@ void SystemClock_Config(void)
   * @brief Power Configuration
   * @retval None
   */
-static void SystemPower_Config(void)
+void SystemPower_Config(void)
 {
 
   /*

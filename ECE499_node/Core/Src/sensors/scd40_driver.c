@@ -36,7 +36,7 @@ uint8_t init_scd40(scd4x_handle_t *gs_handle, scd4x_t type, float cal_pressure, 
     }
     
     /* start */
-    scd4x_perform_self_test(gs_handle, &result);
+    result = scd4x_perform_self_test(gs_handle, &result);
     if(result){
         scd4x_interface_debug_print("scd4x: self test failed.\r\n");
     }
@@ -50,7 +50,9 @@ uint8_t init_scd40(scd4x_handle_t *gs_handle, scd4x_t type, float cal_pressure, 
     //enable automatic self calibration (targets ambient CO2 of 400ppm by default)
     scd4x_set_automatic_self_calibration(gs_handle, SCD4X_BOOL_TRUE);
     //start SCD40 with 30 second sampling period
-    result = scd4x_start_low_power_periodic_measurement(gs_handle);
+    //result = scd4x_start_low_power_periodic_measurement(gs_handle);
+    //start SCD40 with 5 second sampling period - TODO: This is for testing only and should be reverted on pcb
+    result = scd4x_start_periodic_measurement(gs_handle);
     if (result != 0)
     {
         scd4x_interface_debug_print("scd4x: start periodic measurement failed.\n");
@@ -85,7 +87,7 @@ uint8_t scd4x_basic_read(scd4x_handle_t *gs_handle)
     intToStr( (int)scd40_CO2_buf[num_readings], co2,3 );
     my_ftoa(scd40_temp_buf[num_readings],temp,3);
     my_ftoa(scd40_hum_buf[num_readings],hum,3);
-    gs_handle->debug_print(" %s , %s , %s \r\n",co2,temp,hum);
+    gs_handle->debug_print("SCD40: %s , %s , %s \r\n",co2,temp,hum);
     num_readings++;
     if(num_readings >= SCD40_BUF_SIZE){
         num_readings = 0;
