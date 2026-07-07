@@ -51,7 +51,9 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
 
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
-
+#Add LBM Lora Module Driver Library
+set(DLBM_RADIO sx1262 CACHE STRING "Radio used by LBM")
+add_subdirectory(third_party/lbm/lbm_lib)
 # Link directories setup
 target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined library search paths
