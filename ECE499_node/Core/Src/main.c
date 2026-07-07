@@ -20,9 +20,7 @@
 #include "main.h"
 #include "dcache.h"
 #include "icache.h"
-#include "scd40.h"
-#include "stm32u5xx_hal.h"
-#include "uart_logs.h"
+#include "spi.h"
 #include "usart.h"
 #include "gpio.h"
 
@@ -109,7 +107,7 @@ int main(void)
   MX_DCACHE1_Init();
   MX_ICACHE_Init();
   MX_USART1_UART_Init();
-  MX_I2C1_Init();
+  MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
   //initialize the scd40
   
@@ -127,7 +125,7 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-    
+
     /* USER CODE BEGIN 3 */
    HAL_Delay(100); 
    int8_t bme_status = bme680_step(&bme680, bme680_data, &noutputs);
@@ -185,7 +183,7 @@ void SystemClock_Config(void)
   * @brief Power Configuration
   * @retval None
   */
-void SystemPower_Config(void)
+static void SystemPower_Config(void)
 {
 
   /*
