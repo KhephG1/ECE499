@@ -67,6 +67,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${SENSOR_SOURCES}
     ${SX1262_SOURCES}
     Core/Src/uart_logs.c
+    Core/Src/lora_p2p.c
     third_party/lbm/lbm_lib/smtc_modem_hal/smtc_modem_hal.c
 )
 
