@@ -55,7 +55,7 @@ extern "C" {
  * -----------------------------------------------------------------------------
  * --- PUBLIC CONSTANTS --------------------------------------------------------
  */
-#define FLASH_PAGE_NUMBER 256 /* 512 pages available on U575 */
+#define FLASH_PAGE_NUMBER 64 /* STM32U545RE: 512 KB flash / 8 KB pages */
 #define FLASH_PAGE_PER_BANK 128
 
 #define FLASH_USER_START_ADDR ADDR_FLASH_PAGE_0 /* Start @ of user Flash area */

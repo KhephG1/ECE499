@@ -378,8 +378,14 @@ void mcu_gpio_init(void)
     hal_gpio_init_out(SMTC_LED_TX, 0);
     hal_gpio_init_out(SMTC_LED_RX, 0);
 #elif defined(SX126X)
-    // If the sx126x drives the rf switch with dio2, just put the SX126X_RADIO_RF_SWITCH_CTRL in pull up
-    hal_gpio_init_in(SX126X_RADIO_RF_SWITCH_CTRL, BSP_GPIO_PULL_MODE_UP, BSP_GPIO_IRQ_MODE_OFF, NULL);
+    // This module's RF switch (U4) is a discrete external SPDT driven by
+    // dedicated RXEN/TXEN GPIOs -- confirmed by visually tracing the module's
+    // own schematic (no wire from DIO2 to RXEN/TXEN anywhere on the board).
+    // Default to the documented RX/idle combination (RXEN low, TXEN high);
+    // lora_p2p_send() flips to the TX combination only for the duration of
+    // an actual TX.
+    hal_gpio_init_out(RADIO_RXEN, 0);
+    hal_gpio_init_out(RADIO_TXEN, 1);
 #endif
 #endif
 }

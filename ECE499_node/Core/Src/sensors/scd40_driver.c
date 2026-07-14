@@ -8,6 +8,7 @@
 uint16_t scd40_CO2_buf[SCD40_BUF_SIZE] = {};
 float scd40_hum_buf[SCD40_BUF_SIZE] = {};
 float scd40_temp_buf[SCD40_BUF_SIZE] = {};
+static uint8_t num_readings = 0;
 
 uint8_t init_scd40(scd4x_handle_t *gs_handle, scd4x_t type, float cal_pressure, float cal_temp) {
     uint8_t result;
@@ -67,7 +68,6 @@ uint8_t init_scd40(scd4x_handle_t *gs_handle, scd4x_t type, float cal_pressure, 
 
 uint8_t scd4x_basic_read(scd4x_handle_t *gs_handle)
 {
-    static uint8_t num_readings = 0;
     uint8_t res;
     uint16_t co2_raw;
     uint16_t temperature_raw;
@@ -103,4 +103,7 @@ float* get_scd40_temp_readings(){
 }
 float* get_scd40_hum_readings(){
     return scd40_hum_buf;
+}
+uint8_t get_scd40_latest_index(){
+    return (num_readings == 0) ? (SCD40_BUF_SIZE - 1) : (num_readings - 1);
 }

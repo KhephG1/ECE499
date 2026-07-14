@@ -47,30 +47,36 @@ void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(USER_LED_GPIO_Port, USER_LED_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOC, RADIO_RST_Pin|LoRaCS_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LoRaCS_GPIO_Port, LoRaCS_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(RF_SWITCH_GPIO_Port, RF_SWITCH_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin : USER_LED_Pin */
-  GPIO_InitStruct.Pin = USER_LED_Pin;
+  /*Configure GPIO pins : RADIO_RST_Pin LoRaCS_Pin */
+  GPIO_InitStruct.Pin = RADIO_RST_Pin|LoRaCS_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(USER_LED_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : LoRaBUSY_Pin */
-  GPIO_InitStruct.Pin = LoRaBUSY_Pin;
+  /*Configure GPIO pin : RADIO_BUSY_Pin */
+  GPIO_InitStruct.Pin = RADIO_BUSY_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(LoRaBUSY_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(RADIO_BUSY_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : LoRaCS_Pin */
-  GPIO_InitStruct.Pin = LoRaCS_Pin;
+  /*Configure GPIO pin : RF_SWITCH_Pin */
+  GPIO_InitStruct.Pin = RF_SWITCH_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(LoRaCS_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(RF_SWITCH_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : RADIO_DIO_Pin */
+  GPIO_InitStruct.Pin = RADIO_DIO_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(RADIO_DIO_GPIO_Port, &GPIO_InitStruct);
 
 }
 

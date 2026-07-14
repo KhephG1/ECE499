@@ -72,17 +72,21 @@ extern "C"
 #define HW_MODEM_RX_LINE        PB_11
 
 //Radio specific pinout and peripherals
-#define RADIO_NRST              PA_3
+#define RADIO_NRST              PC_6
 #define RADIO_SPI_MOSI          PA_7
 #define RADIO_SPI_MISO          PA_6
-#define RADIO_SPI_SCLK          PA_1
-#define RADIO_NSS               PF_13
-#define RADIO_DIOX              PE_11
-#define RADIO_BUSY_PIN          PE_13
+#define RADIO_SPI_SCLK          PA_5
+#define RADIO_NSS               PC_9
+#define RADIO_DIOX              PB_4
+#define RADIO_BUSY_PIN          PC_7
 
 #define RADIO_SPI_ID            1
 
-#define SX126X_RADIO_RF_SWITCH_CTRL    PF_12 //PA9 L4
+// Waveshare Core1262-868M: RF switch is a discrete external SPDT (U4), driven
+// by dedicated RXEN/TXEN pins broken out on the module header -- NOT by the
+// SX1262's own DIO2 pin (confirmed against the module schematic).
+#define RADIO_RXEN                     PA_8
+#define RADIO_TXEN                     PB_10
 
 //Hw modem specific pinout
 #define HW_MODEM_COMMAND_PIN    PC_6

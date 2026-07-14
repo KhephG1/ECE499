@@ -37,13 +37,16 @@
 #include <bsec_datatypes.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
+#include <string.h>
 
 #include "smtc_hal_mcu.h"
 #include "smtc_hal_lp_timer.h"
 #include "smtc_hal_spi.h"
 #include "smtc_hal_rtc.h"
 #include "modem_pinout.h"
-#include "smtc_modem_utilities.h"
+#include "lora_p2p.h"
+#include "uart_logs.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -53,11 +56,14 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define SCD40_SAMPLE_PERIOD_MS (30000)
+// Set to 1 for bare-bones radio bring-up: skip sensors/sleep/TX entirely and
+// just loop lora_p2p_selftest() over UART. Flip back to 0 once the radio's
+// confirmed alive to restore the full sensor+TX+sleep cycle below.
+#define LORA_P2P_SELFTEST_ONLY (1)
 
-#define LORA_STACK_ID    (0)
-#define LORA_FPORT       (1)
-#define LORA_UPLINK_PERIOD_MS (30000)
+#define SLEEP_PERIOD_MS      (30000)
+#define SENSOR_WAIT_TIMEOUT_MS (5000)
+#define PAYLOAD_LEN           (17)
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -68,24 +74,13 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-// TODO: replace with the DevEUI/JoinEUI/AppKey registered on your LoRaWAN
-// network server (e.g. The Things Network / ChirpStack) for this device.
-static uint8_t lora_dev_eui[8]  = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01 };
-static uint8_t lora_join_eui[8] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
-static uint8_t lora_app_key[16] = { 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
-                                     0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF };
-
-static volatile bool lora_event_pending = false;
-static volatile bool lora_joined        = false;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void SystemPower_Config(void);
 /* USER CODE BEGIN PFP */
-static void lora_on_modem_event(void);
-static void lora_process_events(void);
-static void lora_send_uplink(void);
+static size_t build_payload(uint8_t *out, const bsec_output_t *bme_outputs, uint8_t n_bme_outputs);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -96,69 +91,62 @@ struct bme68x_dev bme680 = {};
 bsec_output_t bme680_data[6] = {};
 uint8_t noutputs = 6;
 
-// Called by the modem stack whenever an event is waiting; keep this short,
-// it can run from radio-IRQ context. Actual handling happens in the main loop.
-static void lora_on_modem_event(void)
+// Packs the latest SCD40 + BME680/BSEC readings into a fixed 17-byte
+// little-endian payload. Layout (offset:type):
+//   0:  uint16  CO2, ppm                        (SCD40)
+//   2:  int16   temperature x100, degC           (SCD40)
+//   4:  int16   humidity x100, %RH                (SCD40)
+//   6:  uint16  CO2 equivalent, ppm                (BME680/BSEC)
+//   8:  uint16  breath VOC equivalent x100, ppm    (BME680/BSEC)
+//   10: int16   heat-compensated humidity x100     (BME680/BSEC)
+//   12: int16   heat-compensated temperature x100  (BME680/BSEC)
+//   14: uint16  raw pressure, hPa x10              (BME680/BSEC)
+//   16: uint8   stabilization status (0/1)         (BME680/BSEC)
+// Any receiver decoding this payload must use the same layout.
+static void put_u16(uint8_t *out, uint16_t v)
 {
-    lora_event_pending = true;
+    out[0] = (uint8_t)(v & 0xFF);
+    out[1] = (uint8_t)(v >> 8);
 }
 
-static void lora_process_events(void)
+static size_t build_payload(uint8_t *out, const bsec_output_t *bme_outputs, uint8_t n_bme_outputs)
 {
-    smtc_modem_event_t event;
-    uint8_t event_pending_count = 0;
+    memset(out, 0, PAYLOAD_LEN);
 
-    lora_event_pending = false;
+    uint8_t idx = get_scd40_latest_index();
+    put_u16(&out[0], get_scd40_CO2_readings()[idx]);
+    put_u16(&out[2], (int16_t)(get_scd40_temp_readings()[idx] * 100.0f));
+    put_u16(&out[4], (int16_t)(get_scd40_hum_readings()[idx] * 100.0f));
 
-    do
+    for (uint8_t i = 0; i < n_bme_outputs; i++)
     {
-        if (smtc_modem_get_event(&event, &event_pending_count) != SMTC_MODEM_RC_OK)
+        const bsec_output_t *o = &bme_outputs[i];
+        switch (o->sensor_id)
         {
+        case BSEC_OUTPUT_CO2_EQUIVALENT:
+            put_u16(&out[6], (uint16_t)o->signal);
             break;
-        }
-
-        switch (event.event_type)
-        {
-        case SMTC_MODEM_EVENT_RESET:
-            smtc_modem_set_deveui(LORA_STACK_ID, lora_dev_eui);
-            smtc_modem_set_joineui(LORA_STACK_ID, lora_join_eui);
-            smtc_modem_set_appkey(LORA_STACK_ID, lora_app_key);
-            // TODO: pick the region that matches your test network
-            smtc_modem_set_region(LORA_STACK_ID, SMTC_MODEM_REGION_US_915);
-            smtc_modem_join_network(LORA_STACK_ID);
+        case BSEC_OUTPUT_BREATH_VOC_EQUIVALENT:
+            put_u16(&out[8], (uint16_t)(o->signal * 100.0f));
             break;
-
-        case SMTC_MODEM_EVENT_JOINED:
-            lora_joined = true;
+        case BSEC_OUTPUT_SENSOR_HEAT_COMPENSATED_HUMIDITY:
+            put_u16(&out[10], (int16_t)(o->signal * 100.0f));
             break;
-
-        case SMTC_MODEM_EVENT_JOINFAIL:
-            lora_joined = false;
+        case BSEC_OUTPUT_SENSOR_HEAT_COMPENSATED_TEMPERATURE:
+            put_u16(&out[12], (int16_t)(o->signal * 100.0f));
             break;
-
-        case SMTC_MODEM_EVENT_TXDONE:
-        case SMTC_MODEM_EVENT_DOWNDATA:
-        case SMTC_MODEM_EVENT_ALARM:
+        case BSEC_OUTPUT_RAW_PRESSURE:
+            put_u16(&out[14], (uint16_t)(o->signal / 10.0f));
+            break;
+        case BSEC_OUTPUT_STABILIZATION_STATUS:
+            out[16] = (uint8_t)o->signal;
+            break;
         default:
             break;
         }
-    } while (event_pending_count > 0);
-}
-
-static void lora_send_uplink(void)
-{
-    static uint32_t counter = 0;
-    uint8_t payload[4];
-
-    payload[0] = (uint8_t)(counter >> 24);
-    payload[1] = (uint8_t)(counter >> 16);
-    payload[2] = (uint8_t)(counter >> 8);
-    payload[3] = (uint8_t)(counter);
-
-    if (smtc_modem_request_uplink(LORA_STACK_ID, LORA_FPORT, false, payload, sizeof(payload)) == SMTC_MODEM_RC_OK)
-    {
-        counter++;
     }
+
+    return PAYLOAD_LEN;
 }
 /* USER CODE END 0 */
 
@@ -202,8 +190,9 @@ int main(void)
   MX_RTC_Init();
   MX_LPTIM1_Init();
   MX_RNG_Init();
- // MX_IWDG_Init();
+  //MX_IWDG_Init();
   /* USER CODE BEGIN 2 */
+#if !LORA_P2P_SELFTEST_ONLY
   //initialize the scd40
 
   if(init_scd40(&scd40, 0, 0.0,0.0) != 0){
@@ -213,6 +202,7 @@ int main(void)
   if(bme680_init(&bme680, BME68X_I2C_INTF) != BSEC_OK){
     Error_Handler();
   }
+#endif
 
   // LoRa radio bring-up: CubeMX's MX_GPIO_Init/MX_SPI1_Init/MX_RTC_Init/
   // MX_LPTIM1_Init already configured the underlying peripherals; these
@@ -223,7 +213,9 @@ int main(void)
   hal_spi_init(RADIO_SPI_ID, RADIO_SPI_MOSI, RADIO_SPI_MISO, RADIO_SPI_SCLK);
   hal_rtc_init();
 
-  smtc_modem_init(&lora_on_modem_event);
+#if !LORA_P2P_SELFTEST_ONLY
+  lora_p2p_init();
+#endif
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -233,33 +225,35 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-   static uint32_t last_sensor_read_tick = 0;
-   static uint32_t last_uplink_tick = 0;
-
-   // smtc_modem_run_engine() drives the LoRaWAN stack (join, radio timing,
-   // retries...) and must be called frequently -- it also services the
-   // IWDG internally, so avoid long blocking delays once this is in place.
-   smtc_modem_run_engine();
-
-   if (lora_event_pending)
+#if LORA_P2P_SELFTEST_ONLY
+   lora_p2p_selftest();
+   HAL_Delay(2000);
+#else
+   // Wake cycle: poll sensors at 100ms cadence until the SCD40's periodic
+   // measurement is ready (or we give up after SENSOR_WAIT_TIMEOUT_MS), TX
+   // one packet, then sleep the radio and MCU until the next cycle.
+   uint32_t cycle_start = HAL_GetTick();
+   uint8_t scd_status;
+   do
    {
-       lora_process_events();
-   }
+       bme680_step(&bme680, bme680_data, &noutputs);
+       scd_status = scd4x_basic_read(&scd40);
+       if (scd_status == 0)
+       {
+           break;
+       }
+       HAL_Delay(100);
+   } while (HAL_GetTick() - cycle_start < SENSOR_WAIT_TIMEOUT_MS);
 
-   if (lora_joined && (HAL_GetTick() - last_uplink_tick >= LORA_UPLINK_PERIOD_MS))
-   {
-       last_uplink_tick = HAL_GetTick();
-       lora_send_uplink();
-   }
+   uint8_t payload[PAYLOAD_LEN];
+   size_t len = build_payload(payload, bme680_data, noutputs);
 
-   if (HAL_GetTick() - last_sensor_read_tick >= 100)
-   {
-       last_sensor_read_tick = HAL_GetTick();
-       int8_t bme_status = bme680_step(&bme680, bme680_data, &noutputs);
-       uint8_t scd_status = scd4x_basic_read(&scd40);
-       (void)bme_status;
-       (void)scd_status;
-   }
+   bool tx_ok = lora_p2p_send(payload, (uint8_t)len, LORA_P2P_TX_TIMEOUT_MS);
+   log_debug("scd_status=%u tx=%s len=%u\r\n", scd_status, tx_ok ? "OK" : "TIMEOUT", (unsigned)len);
+
+   lora_p2p_sleep();
+   hal_mcu_set_sleep_for_ms(SLEEP_PERIOD_MS);
+#endif
   }
   /* USER CODE END 3 */
 }

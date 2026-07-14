@@ -76,12 +76,15 @@
  * --- PRIVATE CONSTANTS -------------------------------------------------------
  */
 
-#define ADDR_FLASH_MODEM_KEY_CONTEXT ADDR_FLASH_PAGE_253
-#define ADDR_FLASH_LORAWAN_CONTEXT ADDR_FLASH_PAGE_254
-#define ADDR_FLASH_MODEM_CONTEXT ADDR_FLASH_PAGE_255
-#define ADDR_FLASH_SECURE_ELEMENT_CONTEXT ADDR_FLASH_PAGE_252
-#define ADDR_FLASH_STORE_AND_FORWARD ADDR_FLASH_PAGE_200
-#define ADDR_FLASH_FUOTA ADDR_FLASH_PAGE_150
+/* STM32U545RE only has 512 KB flash (64 pages of 8 KB) -- unlike the U575
+ * this table was originally written for, so context storage is packed into
+ * the last 6 pages actually present on this part instead of pages 150-255. */
+#define ADDR_FLASH_MODEM_KEY_CONTEXT ADDR_FLASH_PAGE_63
+#define ADDR_FLASH_LORAWAN_CONTEXT ADDR_FLASH_PAGE_62
+#define ADDR_FLASH_MODEM_CONTEXT ADDR_FLASH_PAGE_61
+#define ADDR_FLASH_SECURE_ELEMENT_CONTEXT ADDR_FLASH_PAGE_60
+#define ADDR_FLASH_STORE_AND_FORWARD ADDR_FLASH_PAGE_58
+#define ADDR_FLASH_FUOTA ADDR_FLASH_PAGE_59
 
 /*
  * -----------------------------------------------------------------------------
