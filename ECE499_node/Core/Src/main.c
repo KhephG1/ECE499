@@ -202,7 +202,7 @@ int main(void)
   MX_RTC_Init();
   MX_LPTIM1_Init();
   MX_RNG_Init();
-  MX_IWDG_Init();
+ // MX_IWDG_Init();
   /* USER CODE BEGIN 2 */
   //initialize the scd40
 

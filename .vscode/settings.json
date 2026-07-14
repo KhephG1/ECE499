@@ -1,0 +1,6 @@
+{
+  "idf.espIdfPath": "/home/kheph/.espressif",
+  "idf.toolsPath": "/home/kheph/.espressif",
+  "idf.pythonBinPath": "/home/kheph/.espressif/python_env/idf5.x_py3.x_env/bin/python",
+  "cmake.sourceDirectory": "/home/kheph/Projects/School/ECE499/ECE499_node"
+}
