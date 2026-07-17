@@ -94,8 +94,7 @@ void HAL_RTC_MspInit(RTC_HandleTypeDef* rtcHandle)
     __HAL_RCC_RTCAPB_CLK_ENABLE();
     __HAL_RCC_RTCAPB_CLKAM_ENABLE();
   /* USER CODE BEGIN RTC_MspInit 1 */
-    HAL_NVIC_SetPriority(RTC_IRQn, 0, 0);
-    HAL_NVIC_EnableIRQ(RTC_IRQn);
+
   /* USER CODE END RTC_MspInit 1 */
   }
 }
@@ -113,7 +112,7 @@ void HAL_RTC_MspDeInit(RTC_HandleTypeDef* rtcHandle)
     __HAL_RCC_RTCAPB_CLK_DISABLE();
     __HAL_RCC_RTCAPB_CLKAM_DISABLE();
   /* USER CODE BEGIN RTC_MspDeInit 1 */
-    HAL_NVIC_DisableIRQ(RTC_IRQn);
+
   /* USER CODE END RTC_MspDeInit 1 */
   }
 }
