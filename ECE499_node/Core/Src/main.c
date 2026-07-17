@@ -20,7 +20,6 @@
 #include "main.h"
 #include "dcache.h"
 #include "icache.h"
-#include "iwdg.h"
 #include "lptim.h"
 #include "rng.h"
 #include "rtc.h"
@@ -33,7 +32,6 @@
 #include "scd40_driver.h"
 #include "bme680_defs.h"
 #include "bme680_driver.h"
-#include "i2c.h"
 #include <bsec_datatypes.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -310,7 +308,6 @@ int main(void)
   MX_RTC_Init();
   MX_LPTIM1_Init();
   MX_RNG_Init();
-  //MX_IWDG_Init();
   /* USER CODE BEGIN 2 */
   //initialize the scd40
 
