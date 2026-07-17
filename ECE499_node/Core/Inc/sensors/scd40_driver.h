@@ -13,4 +13,7 @@ float* get_scd40_temp_readings();
 
 uint16_t* get_scd40_CO2_readings();
 
+//index of the most recently written slot in the reading buffers
+uint8_t get_scd40_latest_index();
+
 #endif

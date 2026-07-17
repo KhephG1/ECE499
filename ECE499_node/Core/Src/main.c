@@ -37,13 +37,12 @@
 #include <bsec_datatypes.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
+#include <string.h>
 
-#include "smtc_hal_mcu.h"
-#include "smtc_hal_lp_timer.h"
-#include "smtc_hal_spi.h"
-#include "smtc_hal_rtc.h"
-#include "modem_pinout.h"
-#include "smtc_modem_utilities.h"
+#include "sx126x.h"
+#include "uart_logs.h"
+#include "lora_link.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -53,11 +52,28 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define SCD40_SAMPLE_PERIOD_MS (30000)
+#define SLEEP_PERIOD_MS      (30000)
+#define SENSOR_WAIT_TIMEOUT_MS (5000)
+#define PAYLOAD_LEN           (LORA_LINK_PAYLOAD_LEN)
 
-#define LORA_STACK_ID    (0)
-#define LORA_FPORT       (1)
-#define LORA_UPLINK_PERIOD_MS (30000)
+/*
+ * Radio configuration.
+ *
+ * Everything the gateway also has to agree on -- frequency, SF, bandwidth,
+ * coding rate, preamble, sync word -- comes from shared/lora_link.h and must
+ * be changed there, not here. Only settings local to this board live below.
+ *
+ * The TCXO settings describe the crystal on the Waveshare module, wired to
+ * DIO3. RADIO_TCXO_VOLTAGE takes an sx126x_tcxo_ctrl_voltages_t
+ * (e.g. SX126X_TCXO_CTRL_1_7) and RADIO_TCXO_STARTUP_MS is how long the TCXO
+ * needs to settle before the PLL may use it.
+ */
+#define RADIO_FREQ_HZ (LORA_LINK_FREQ_HZ)
+#define RADIO_TX_POWER_DBM (22)
+#define RADIO_TCXO_VOLTAGE SX126X_TCXO_CTRL_1_7V
+#define RADIO_TCXO_STARTUP_MS (5)
+
+#define RADIO_TX_TIMEOUT_MS   (5000)
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -68,97 +84,189 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-// TODO: replace with the DevEUI/JoinEUI/AppKey registered on your LoRaWAN
-// network server (e.g. The Things Network / ChirpStack) for this device.
-static uint8_t lora_dev_eui[8]  = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01 };
-static uint8_t lora_join_eui[8] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
-static uint8_t lora_app_key[16] = { 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
-                                     0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF };
-
-static volatile bool lora_event_pending = false;
-static volatile bool lora_joined        = false;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void SystemPower_Config(void);
 /* USER CODE BEGIN PFP */
-static void lora_on_modem_event(void);
-static void lora_process_events(void);
-static void lora_send_uplink(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+// sx1262_hal.c talks to a single hard-wired radio and ignores the context
+// argument, so there is nothing to point this at.
+static const void *radio_ctx = NULL;
+
+// The sx126x enums encode SF as its own numeric value and CR as (denominator -
+// 4), so the shared link constants can be checked against the enums the driver
+// actually wants at compile time rather than trusted to stay in step.
+_Static_assert(SX126X_LORA_SF9 == LORA_LINK_SF,
+               "SF disagrees with shared/lora_link.h");
+_Static_assert(SX126X_LORA_CR_4_7 + 4 == LORA_LINK_CR_DENOM,
+               "coding rate disagrees with shared/lora_link.h");
+_Static_assert(LORA_LINK_EXPLICIT_HDR && LORA_LINK_CRC_ON && !LORA_LINK_INVERT_IQ,
+               "packet params below no longer match shared/lora_link.h");
+
+static sx126x_pkt_params_lora_t radio_pkt_params = {
+    .preamble_len_in_symb = LORA_LINK_PREAMBLE_SYMB,
+    .header_type          = SX126X_LORA_PKT_EXPLICIT,
+    .pld_len_in_bytes     = 0,  // set per packet in radio_transmit()
+    .crc_is_on            = true,
+    .invert_iq_is_on      = false,
+};
+
+// Brings the radio from power-on to "configured, in standby, ready to be
+// handed a payload". Returns false at the first command the chip rejects.
+static bool radio_init(void)
+{
+    // Must stay in step with shared/lora_link.h; the _Static_asserts above
+    // cover sf and cr, and BW_125 is the enum for LORA_LINK_BW_KHZ.
+    const sx126x_mod_params_lora_t mod_params = {
+        .sf   = SX126X_LORA_SF9,
+        .bw   = SX126X_LORA_BW_125,
+        .cr   = SX126X_LORA_CR_4_7,
+        .ldro = 0,  // only needed when symbol time exceeds 16ms (SF11/SF12 at BW125)
+    };
+
+    // +22dBm PA config for the SX1262, datasheet table 13-21. device_sel picks
+    // the SX1262's high-power PA over the SX1261's.
+    const sx126x_pa_cfg_params_t pa_cfg = {
+        .pa_duty_cycle = 0x04,
+        .hp_max        = 0x07,
+        .device_sel    = 0x00,
+        .pa_lut        = 0x01,
+    };
+
+    if (sx126x_reset(radio_ctx) != SX126X_STATUS_OK) return false;
+    if (sx126x_set_standby(radio_ctx, SX126X_STANDBY_CFG_RC) != SX126X_STATUS_OK) return false;
+
+    // The Waveshare module clocks the chip from a TCXO powered off DIO3, which
+    // means the chip booted on a crystal that is not there. Every block
+    // calibrated at boot has to be recalibrated once the TCXO is running.
+    if (sx126x_set_dio3_as_tcxo_ctrl(radio_ctx, RADIO_TCXO_VOLTAGE,
+                                     sx126x_convert_timeout_in_ms_to_rtc_step(RADIO_TCXO_STARTUP_MS))
+        != SX126X_STATUS_OK) return false;
+    if (sx126x_cal(radio_ctx, SX126X_CAL_ALL) != SX126X_STATUS_OK) return false;
+
+    if (sx126x_set_dio2_as_rf_sw_ctrl(radio_ctx, true) != SX126X_STATUS_OK) return false;
+    if (sx126x_set_reg_mode(radio_ctx, SX126X_REG_MODE_DCDC) != SX126X_STATUS_OK) return false;
+
+    if (sx126x_set_pkt_type(radio_ctx, SX126X_PKT_TYPE_LORA) != SX126X_STATUS_OK) return false;
+    if (sx126x_set_rf_freq(radio_ctx, RADIO_FREQ_HZ) != SX126X_STATUS_OK) return false;
+    if (sx126x_cal_img_in_mhz(radio_ctx, RADIO_FREQ_HZ / 1000000, RADIO_FREQ_HZ / 1000000)
+        != SX126X_STATUS_OK) return false;
+
+    if (sx126x_set_pa_cfg(radio_ctx, &pa_cfg) != SX126X_STATUS_OK) return false;
+    // SX1262 errata 15.2: the TX clamp must be reconfigured after set_pa_cfg.
+    if (sx126x_cfg_tx_clamp(radio_ctx) != SX126X_STATUS_OK) return false;
+    if (sx126x_set_tx_params(radio_ctx, RADIO_TX_POWER_DBM, SX126X_RAMP_200_US) != SX126X_STATUS_OK) return false;
+
+    if (sx126x_set_buffer_base_address(radio_ctx, 0, 0) != SX126X_STATUS_OK) return false;
+    if (sx126x_set_lora_mod_params(radio_ctx, &mod_params) != SX126X_STATUS_OK) return false;
+    if (sx126x_set_lora_pkt_params(radio_ctx, &radio_pkt_params) != SX126X_STATUS_OK) return false;
+
+    // The chip powers up with this already at 0x1424, so the link happened to
+    // work without it, but a receiver only accepts a matching sync word and
+    // nothing else here pins the value down. Set it explicitly.
+    if (sx126x_set_lora_sync_word(radio_ctx, LORA_LINK_SYNC_WORD) != SX126X_STATUS_OK) return false;
+
+    if (sx126x_set_dio_irq_params(radio_ctx, SX126X_IRQ_TX_DONE | SX126X_IRQ_TIMEOUT,
+                                  SX126X_IRQ_TX_DONE | SX126X_IRQ_TIMEOUT, 0, 0) != SX126X_STATUS_OK) return false;
+
+    return true;
+}
+
+// Sends one packet and blocks until the chip reports TX_DONE. Polls the IRQ
+// register rather than DIO1 so this stays independent of EXTI setup.
+static bool radio_transmit(const uint8_t *payload, uint8_t len)
+{
+    radio_pkt_params.pld_len_in_bytes = len;
+    if (sx126x_set_lora_pkt_params(radio_ctx, &radio_pkt_params) != SX126X_STATUS_OK) return false;
+
+    if (sx126x_write_buffer(radio_ctx, 0, payload, len) != SX126X_STATUS_OK) return false;
+    if (sx126x_clear_irq_status(radio_ctx, SX126X_IRQ_ALL) != SX126X_STATUS_OK) return false;
+    if (sx126x_set_tx(radio_ctx, RADIO_TX_TIMEOUT_MS) != SX126X_STATUS_OK) return false;
+
+    // The chip's own TX timeout should fire first; this bound only keeps a
+    // wedged radio from hanging the loop forever.
+    uint32_t started = HAL_GetTick();
+    while (HAL_GetTick() - started < RADIO_TX_TIMEOUT_MS + 1000)
+    {
+        sx126x_irq_mask_t irq = 0;
+        if (sx126x_get_irq_status(radio_ctx, &irq) != SX126X_STATUS_OK) return false;
+
+        if (irq & SX126X_IRQ_TX_DONE)
+        {
+            sx126x_clear_irq_status(radio_ctx, SX126X_IRQ_TX_DONE);
+            return true;
+        }
+        if (irq & SX126X_IRQ_TIMEOUT)
+        {
+            sx126x_clear_irq_status(radio_ctx, SX126X_IRQ_TIMEOUT);
+            log_error("radio: tx timeout\r\n");
+            return false;
+        }
+    }
+
+    log_error("radio: tx never completed\r\n");
+    return false;
+}
+
 //struct for the scd40 sensor
 scd4x_handle_t scd40 = {};
 struct bme68x_dev bme680 = {};
 bsec_output_t bme680_data[6] = {};
-uint8_t noutputs = 6;
-
-// Called by the modem stack whenever an event is waiting; keep this short,
-// it can run from radio-IRQ context. Actual handling happens in the main loop.
-static void lora_on_modem_event(void)
+#define BME680_MAX_OUTPUTS ((uint8_t)(sizeof(bme680_data) / sizeof(bme680_data[0])))
+uint8_t noutputs = BME680_MAX_OUTPUTS;
+// Packs the latest SCD40 + BME680/BSEC readings into the fixed little-endian
+// payload described by shared/lora_link.h. The gateway decodes it from those
+// same offsets, so the layout is defined there rather than here.
+static void put_u16(uint8_t *out, uint16_t v)
 {
-    lora_event_pending = true;
+    out[0] = (uint8_t)(v & 0xFF);
+    out[1] = (uint8_t)(v >> 8);
 }
 
-static void lora_process_events(void)
+static size_t build_payload(uint8_t *out, const bsec_output_t *bme_outputs, uint8_t n_bme_outputs)
 {
-    smtc_modem_event_t event;
-    uint8_t event_pending_count = 0;
+    memset(out, 0, PAYLOAD_LEN);
 
-    lora_event_pending = false;
+    uint8_t idx = get_scd40_latest_index();
+    put_u16(&out[LORA_PL_OFF_SCD_CO2], get_scd40_CO2_readings()[idx]);
+    put_u16(&out[LORA_PL_OFF_SCD_TEMP], (int16_t)(get_scd40_temp_readings()[idx] * 100.0f));
+    put_u16(&out[LORA_PL_OFF_SCD_HUM], (int16_t)(get_scd40_hum_readings()[idx] * 100.0f));
 
-    do
+    for (uint8_t i = 0; i < n_bme_outputs; i++)
     {
-        if (smtc_modem_get_event(&event, &event_pending_count) != SMTC_MODEM_RC_OK)
+        const bsec_output_t *o = &bme_outputs[i];
+        switch (o->sensor_id)
         {
+        case BSEC_OUTPUT_CO2_EQUIVALENT:
+            put_u16(&out[LORA_PL_OFF_BME_CO2EQ], (uint16_t)o->signal);
             break;
-        }
-
-        switch (event.event_type)
-        {
-        case SMTC_MODEM_EVENT_RESET:
-            smtc_modem_set_deveui(LORA_STACK_ID, lora_dev_eui);
-            smtc_modem_set_joineui(LORA_STACK_ID, lora_join_eui);
-            smtc_modem_set_appkey(LORA_STACK_ID, lora_app_key);
-            // TODO: pick the region that matches your test network
-            smtc_modem_set_region(LORA_STACK_ID, SMTC_MODEM_REGION_US_915);
-            smtc_modem_join_network(LORA_STACK_ID);
+        case BSEC_OUTPUT_BREATH_VOC_EQUIVALENT:
+            put_u16(&out[LORA_PL_OFF_BME_VOC], (uint16_t)(o->signal * 100.0f));
             break;
-
-        case SMTC_MODEM_EVENT_JOINED:
-            lora_joined = true;
+        case BSEC_OUTPUT_SENSOR_HEAT_COMPENSATED_HUMIDITY:
+            put_u16(&out[LORA_PL_OFF_BME_HUM], (int16_t)(o->signal * 100.0f));
             break;
-
-        case SMTC_MODEM_EVENT_JOINFAIL:
-            lora_joined = false;
+        case BSEC_OUTPUT_SENSOR_HEAT_COMPENSATED_TEMPERATURE:
+            put_u16(&out[LORA_PL_OFF_BME_TEMP], (int16_t)(o->signal * 100.0f));
             break;
-
-        case SMTC_MODEM_EVENT_TXDONE:
-        case SMTC_MODEM_EVENT_DOWNDATA:
-        case SMTC_MODEM_EVENT_ALARM:
+        case BSEC_OUTPUT_RAW_PRESSURE:
+            put_u16(&out[LORA_PL_OFF_BME_PRESS], (uint16_t)(o->signal / 10.0f));
+            break;
+        case BSEC_OUTPUT_STABILIZATION_STATUS:
+            out[LORA_PL_OFF_BME_STAB] = (uint8_t)o->signal;
+            break;
         default:
             break;
         }
-    } while (event_pending_count > 0);
-}
-
-static void lora_send_uplink(void)
-{
-    static uint32_t counter = 0;
-    uint8_t payload[4];
-
-    payload[0] = (uint8_t)(counter >> 24);
-    payload[1] = (uint8_t)(counter >> 16);
-    payload[2] = (uint8_t)(counter >> 8);
-    payload[3] = (uint8_t)(counter);
-
-    if (smtc_modem_request_uplink(LORA_STACK_ID, LORA_FPORT, false, payload, sizeof(payload)) == SMTC_MODEM_RC_OK)
-    {
-        counter++;
     }
+
+    return PAYLOAD_LEN;
 }
 /* USER CODE END 0 */
 
@@ -202,7 +310,7 @@ int main(void)
   MX_RTC_Init();
   MX_LPTIM1_Init();
   MX_RNG_Init();
-  MX_IWDG_Init();
+  //MX_IWDG_Init();
   /* USER CODE BEGIN 2 */
   //initialize the scd40
 
@@ -214,16 +322,15 @@ int main(void)
     Error_Handler();
   }
 
-  // LoRa radio bring-up: CubeMX's MX_GPIO_Init/MX_SPI1_Init/MX_RTC_Init/
-  // MX_LPTIM1_Init already configured the underlying peripherals; these
-  // calls populate the smtc_hal layer's own handles on top of them and
-  // set up the radio-specific control pins CubeMX doesn't know about.
-  mcu_gpio_init();
-  hal_lp_timer_init(HAL_LP_TIMER_ID_1);
-  hal_spi_init(RADIO_SPI_ID, RADIO_SPI_MOSI, RADIO_SPI_MISO, RADIO_SPI_SCLK);
-  hal_rtc_init();
-
-  smtc_modem_init(&lora_on_modem_event);
+  // LoRa radio bring-up. MX_GPIO_Init and MX_SPI1_Init have already set up the
+  // pins and the SPI bus the HAL port drives, so the radio can be configured
+  // directly from here.
+  if (!radio_init())
+  {
+    log_error("radio: init failed\r\n");
+    Error_Handler();
+  }
+  log_info("radio: init ok\r\n");
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -233,32 +340,55 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-   static uint32_t last_sensor_read_tick = 0;
-   static uint32_t last_uplink_tick = 0;
+   // Wake cycle: poll the sensors at a 100ms cadence until the SCD40's
+   // periodic measurement is ready (or we give up after
+   // SENSOR_WAIT_TIMEOUT_MS), then TX one packet and idle until the next
+   // cycle. Sensors are read before the payload is built so the first packet
+   // out carries real readings rather than zeros.
+   uint32_t cycle_start = HAL_GetTick();
+   uint8_t scd_status;
+   uint8_t bme_noutputs = 0;
 
-   // smtc_modem_run_engine() drives the LoRaWAN stack (join, radio timing,
-   // retries...) and must be called frequently -- it also services the
-   // IWDG internally, so avoid long blocking delays once this is in place.
-   smtc_modem_run_engine();
-
-   if (lora_event_pending)
+   do
    {
-       lora_process_events();
+       // BSEC reads noutputs as the capacity of bme680_data on the way in and
+       // overwrites it with the number of outputs it produced, so it has to be
+       // reset before every call or the capacity ratchets down.
+       noutputs = BME680_MAX_OUTPUTS;
+       if (bme680_step(&bme680, bme680_data, &noutputs) == BME68X_OK)
+       {
+           bme_noutputs = noutputs;
+       }
+
+       scd_status = scd4x_basic_read(&scd40);
+       if (scd_status == 0)
+       {
+           break;
+       }
+       HAL_Delay(100);
+   } while (HAL_GetTick() - cycle_start < SENSOR_WAIT_TIMEOUT_MS);
+
+   if (scd_status != 0)
+   {
+       // Send anyway: the BME680 fields are still fresh and the SCD40 fields
+       // fall back to the previous cycle's readings.
+       log_error("scd40: no measurement this cycle\r\n");
    }
 
-   if (lora_joined && (HAL_GetTick() - last_uplink_tick >= LORA_UPLINK_PERIOD_MS))
+   uint8_t payload[PAYLOAD_LEN];
+   build_payload(payload, bme680_data, bme_noutputs);
+   if (radio_transmit(payload, PAYLOAD_LEN))
    {
-       last_uplink_tick = HAL_GetTick();
-       lora_send_uplink();
+       log_info("radio: tx ok\r\n");
    }
 
-   if (HAL_GetTick() - last_sensor_read_tick >= 100)
+   // Pad out to a fixed cycle period. The SCD40 must not be read more often
+   // than once every 30s, so this cannot be shortened without also revisiting
+   // SLEEP_PERIOD_MS.
+   uint32_t elapsed = HAL_GetTick() - cycle_start;
+   if (elapsed < SLEEP_PERIOD_MS)
    {
-       last_sensor_read_tick = HAL_GetTick();
-       int8_t bme_status = bme680_step(&bme680, bme680_data, &noutputs);
-       uint8_t scd_status = scd4x_basic_read(&scd40);
-       (void)bme_status;
-       (void)scd_status;
+       HAL_Delay(SLEEP_PERIOD_MS - elapsed);
    }
   }
   /* USER CODE END 3 */

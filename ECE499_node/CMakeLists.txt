@@ -51,30 +51,33 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
 
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
-#Add LBM Lora Module Driver Library
-set(LBM_RADIO sx1262 CACHE STRING "Radio used by LBM")
-add_subdirectory(third_party/lbm/lbm_lib)
+
+# Semtech SX126x radio driver. Entered via src/ rather than the vendor root so
+# we skip its project()/install()/export() rules, which only matter when the
+# driver is consumed as a standalone installed package.
+add_subdirectory(third_party/sx1262/src)
+
 # Link directories setup
 target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined library search paths
 )
-add_subdirectory(third_party/smtc_hal)
+
 file(GLOB_RECURSE SENSOR_SOURCES CONFIGURE_DEPENDS "Core/Src/sensors/*.c")
-file(GLOB_RECURSE SX1262_SOURCES CONFIGURE_DEPENDS "Core/Src/sx1262/*.c")
+
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
     ${SENSOR_SOURCES}
-    ${SX1262_SOURCES}
     Core/Src/uart_logs.c
-    third_party/lbm/lbm_lib/smtc_modem_hal/smtc_modem_hal.c
+    third_party/sx1262/src/sx1262_hal.c
 )
 
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined include paths
     Core/Inc/sensors/
-    Core/Inc/sx1262/
+    # Link parameters shared with ECE499_gateway; see shared/lora_link.h
+    ${PROJECT_SOURCE_DIR}/../shared
 )
 
 # Add project symbols (macros)
@@ -90,10 +93,5 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
      BSEC #bosh bsec binary
      m #math.h
     # Add user defined libraries
-    LoRaBasicsModemApi
-    lora_basics_modem_combined
-    smtc_hal
     sx126x_driver
-    smtc_ral::smtc_ral_sx126x
-    smtc_ralf::smtc_ralf_sx126x
 )
