@@ -24,6 +24,7 @@
 #include "rng.h"
 #include "rtc.h"
 #include "spi.h"
+#include "stm32u5xx_hal.h"
 #include "usart.h"
 #include "gpio.h"
 
@@ -50,7 +51,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define SLEEP_PERIOD_MS      (30000)
+#define TIMER_ARR_5SECONDS      (10240) //(32.768kHz / 16) / 10240 = 0.2Hz = 5s period
 #define SENSOR_WAIT_TIMEOUT_MS (5000)
 #define PAYLOAD_LEN           (LORA_LINK_PAYLOAD_LEN)
 
@@ -67,10 +68,9 @@
  * needs to settle before the PLL may use it.
  */
 #define RADIO_FREQ_HZ (LORA_LINK_FREQ_HZ)
-#define RADIO_TX_POWER_DBM (22)
+#define RADIO_TX_POWER_DBM (-9)
 #define RADIO_TCXO_VOLTAGE SX126X_TCXO_CTRL_1_7V
 #define RADIO_TCXO_STARTUP_MS (5)
-
 #define RADIO_TX_TIMEOUT_MS   (5000)
 /* USER CODE END PD */
 
@@ -308,6 +308,7 @@ int main(void)
   MX_RTC_Init();
   MX_LPTIM1_Init();
   MX_RNG_Init();
+  MX_LPTIM2_Init();
   /* USER CODE BEGIN 2 */
   //initialize the scd40
 
@@ -378,15 +379,11 @@ int main(void)
    {
        log_info("radio: tx ok\r\n");
    }
-
-   // Pad out to a fixed cycle period. The SCD40 must not be read more often
-   // than once every 30s, so this cannot be shortened without also revisiting
-   // SLEEP_PERIOD_MS.
-   uint32_t elapsed = HAL_GetTick() - cycle_start;
-   if (elapsed < SLEEP_PERIOD_MS)
-   {
-       HAL_Delay(SLEEP_PERIOD_MS - elapsed);
-   }
+   HAL_LPTIM_TimeOut_Start_IT(&hlptim1, TIMER_ARR_5SECONDS);
+   HAL_DBGMCU_EnableDBGStopMode();
+   HAL_PWREx_EnterSTOP2Mode(PWR_STOPENTRY_WFI);
+   SystemClock_Config();
+   SystemPower_Config();
   }
   /* USER CODE END 3 */
 }
