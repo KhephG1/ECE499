@@ -51,9 +51,9 @@ uint8_t init_scd40(scd4x_handle_t *gs_handle, scd4x_t type, float cal_pressure, 
     //enable automatic self calibration (targets ambient CO2 of 400ppm by default)
     scd4x_set_automatic_self_calibration(gs_handle, SCD4X_BOOL_TRUE);
     //start SCD40 with 30 second sampling period
-    //result = scd4x_start_low_power_periodic_measurement(gs_handle);
+    result = scd4x_start_low_power_periodic_measurement(gs_handle);
     //start SCD40 with 5 second sampling period - TODO: This is for testing only and should be reverted on pcb
-    result = scd4x_start_periodic_measurement(gs_handle);
+    //result = scd4x_start_periodic_measurement(gs_handle);
     if (result != 0)
     {
         scd4x_interface_debug_print("scd4x: start periodic measurement failed.\n");
