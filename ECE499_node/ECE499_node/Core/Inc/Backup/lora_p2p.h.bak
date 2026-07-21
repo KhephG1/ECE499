@@ -1,0 +1,24 @@
+#ifndef LORA_P2P_H
+#define LORA_P2P_H
+
+#include <stdint.h>
+#include <stdbool.h>
+
+/* RF parameters -- must match the receiver exactly. */
+#define LORA_P2P_FREQ_HZ       (915000000UL)
+#define LORA_P2P_TX_POWER_DBM  (14)
+#define LORA_P2P_TX_TIMEOUT_MS (4000UL)
+
+/* Waveshare Core1262-868M carries a 32MHz TCXO (Q1) powered directly from
+ * the sx1262's DIO3 pin (confirmed against the module schematic). Neither
+ * the module page nor schematic print an exact rated voltage/startup time --
+ * 1.8V / 10ms are common defaults for this class of TCXO; adjust if the
+ * radio still won't lock (e.g. lora_p2p_send keeps timing out). */
+#define LORA_P2P_TCXO_VOLTAGE                 SX126X_TCXO_CTRL_1_8V
+#define LORA_P2P_TCXO_STARTUP_TIME_RTC_STEPS  (640UL) /* ~10ms, 64 steps/ms */
+
+bool lora_p2p_init(void);
+bool lora_p2p_send(const uint8_t *payload, uint8_t len, uint32_t timeout_ms);
+void lora_p2p_sleep(void);
+
+#endif /* LORA_P2P_H */

@@ -1,11 +1,7 @@
 {
-    "idf.espIdfPath": "/home/kheph/.espressif",
-    "idf.toolsPath": "/home/kheph/.espressif",
-    "idf.pythonBinPath": "/home/kheph/.espressif/python_env/idf5.x_py3.x_env/bin/python",
     "cmake.cmakePath": "cube-cmake",
     "cmake.configureArgs": [
-        "-DCMAKE_COMMAND=cube-cmake",
-        "-DLBM_RADIO=sx1262"
+        "-DCMAKE_COMMAND=cube-cmake"
     ],
     "cmake.preferredGenerators": [
         "Ninja"
@@ -15,7 +11,5 @@
         "starm-clangd",
         "--query-driver=${env:CUBE_BUNDLE_PATH}/gnu-tools-for-stm32/14.3.1+st.2/bin/arm-none-eabi-gcc*",
         "--query-driver=${env:CUBE_BUNDLE_PATH}/gnu-tools-for-stm32/14.3.1+st.2/bin/arm-none-eabi-g++*"
-    ],
-    "C_Cpp.intelliSenseEngine": "disabled",
-    "cmake.sourceDirectory": "/home/khephrengould/Documents/Projects/School/ECE499/ECE499_node/ECE499_node"
+    ]
 }
