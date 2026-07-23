@@ -23,7 +23,6 @@
 #include "i2c.h"
 #include "icache.h"
 #include "lptim.h"
-#include "usart.h"
 #include "spi.h"
 #include "gpio.h"
 
@@ -38,6 +37,8 @@
 #include <stddef.h>
 #include <string.h>
 
+#include "stm32u5xx_hal.h"
+#include "stm32u5xx_hal_lptim.h"
 #include "sx126x.h"
 #include "uart_logs.h"
 #include "lora_link.h"
@@ -50,11 +51,12 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define TIMER_ARR_5SECONDS      (10240) //(32.768kHz / 16) / 10240 = 0.2Hz = 5s period
-#define SENSOR_WAIT_TIMEOUT_MS (5000)
+#define TIMER_ARR_15SECONDS      (61440) //(32.768kHz / 8) / 61440 gives a 15.3 second period
+#define TIMER_ARR_5SECONDS    (20480)
+#define SENSOR_WAIT_TIMEOUT_MS (1000)
 #define PAYLOAD_LEN           (LORA_LINK_PAYLOAD_LEN)
 #define ADC_CODE_MAX (1 << 14)
-#define NODE_ID (0x01) 
+#define NODE_ID (1) 
 
 /*
  * Radio configuration.
@@ -294,17 +296,23 @@ void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin)
   //invalid battery volatge to indicate vbatok has gone low
    battery_voltage  = 0;
    uint8_t payload[PAYLOAD_LEN];
-   build_payload(payload, bme680_data, noutputs);
-   //make an emergency transmission to indicate low battery state to gateway
-   if (radio_ctx !=NULL && radio_transmit(payload, PAYLOAD_LEN))
-   {
-       log_info("radio: tx ok\r\n");
-   }
+  //  build_payload(payload, bme680_data, noutputs);
+  //  //make an emergency transmission to indicate low battery state to gateway
+  //  if (radio_ctx !=NULL && radio_transmit(payload, PAYLOAD_LEN))
+  //  {
+  //      log_info("radio: tx ok\r\n");
+  //  }
   } else {
       __NOP();
   }
 }
-
+void HAL_LPTIM_AutoReloadMatchCallback(LPTIM_HandleTypeDef *hlptim)
+{
+	if(hlptim == &hlptim1)
+	{
+    __NOP();
+	}
+}
 
 /* USER CODE END 0 */
 
@@ -346,12 +354,11 @@ int main(void)
   MX_SPI3_Init();
   MX_DCACHE1_Init();
   MX_ICACHE_Init();
-  MX_LPTIM2_Init();
-  MX_LPUART1_UART_Init();
+  MX_LPTIM1_Init();
   /* USER CODE BEGIN 2 */
   //status indicator
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6,GPIO_PIN_RESET);
-  HAL_Delay(2000);
+  HAL_Delay(500);
   HAL_GPIO_WritePin(GPIOC,  GPIO_PIN_6, GPIO_PIN_SET);
   //initialize the scd40
 
@@ -374,6 +381,8 @@ int main(void)
   log_info("radio: init ok\r\n");
   //calibrate ADC
   HAL_ADCEx_Calibration_Start(&hadc1,ADC_CALIB_OFFSET,ADC_SINGLE_ENDED );
+  __HAL_RCC_LPTIM1_CLK_SLEEP_ENABLE();
+  __HAL_RCC_LPTIM1_CLKAM_ENABLE();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -406,6 +415,7 @@ int main(void)
        scd_status = scd4x_basic_read(&scd40);
        if (scd_status == 0)
        {
+
            break;
        }
        //read the battery voltage
@@ -432,10 +442,23 @@ int main(void)
    {
        log_info("radio: tx ok\r\n");
    }
-   HAL_LPTIM_TimeOut_Start_IT(&hlptim2, TIMER_ARR_5SECONDS);
-   HAL_DBGMCU_EnableDBGStopMode();
+      /* mask the EXTI wakeup requests, not just the NVIC */
+   EXTI->IMR1 &= ~(GPIO_EXTI4_Pin | GPIO_PIN_2);
+   __HAL_GPIO_EXTI_CLEAR_IT(GPIO_EXTI4_Pin);
+   __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_2);
+   HAL_NVIC_ClearPendingIRQ(EXTI4_IRQn);
+   HAL_NVIC_ClearPendingIRQ(EXTI2_IRQn);
+   HAL_LPTIM_Counter_Start_IT(&hlptim1);
+   HAL_SuspendTick();
    HAL_PWREx_EnterSTOP2Mode(PWR_STOPENTRY_WFI);
    SystemClock_Config();
+   HAL_ResumeTick();
+   HAL_LPTIM_TimeOut_Stop_IT(&hlptim1);
+
+   __HAL_GPIO_EXTI_CLEAR_IT(GPIO_EXTI4_Pin);   /* drop edg*/
+   __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_2);
+   EXTI->IMR1 |= (GPIO_EXTI4_Pin | GPIO_PIN_2);
+
   }
   /* USER CODE END 3 */
 }
@@ -458,12 +481,15 @@ void SystemClock_Config(void)
 
   /** Initializes the CPU, AHB and APB buses clocks
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_MSI;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_LSI
+                              |RCC_OSCILLATORTYPE_MSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.MSIState = RCC_MSI_ON;
   RCC_OscInitStruct.MSICalibrationValue = RCC_MSICALIBRATION_DEFAULT;
   RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_4;
+  RCC_OscInitStruct.LSIDiv = RCC_LSI_DIV1;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
@@ -497,9 +523,6 @@ static void SystemPower_Config(void)
   /*
    * SRAM Power Down In Stop Mode Config
    */
-  HAL_PWREx_DisableRAMsContentStopRetention(PWR_ICACHE_FULL_STOP_RETENTION);
-  HAL_PWREx_DisableRAMsContentStopRetention(PWR_DCACHE1_FULL_STOP_RETENTION);
-  HAL_PWREx_DisableRAMsContentStopRetention(PWR_DMA2DRAM_FULL_STOP_RETENTION);
   HAL_PWREx_DisableRAMsContentStopRetention(PWR_PKA32RAM_FULL_STOP_RETENTION);
 /* USER CODE BEGIN PWR */
 /* USER CODE END PWR */

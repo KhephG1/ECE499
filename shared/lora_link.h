@@ -61,7 +61,7 @@
 #define LORA_PL_OFF_BME_HUM      10  /* i16, %RH x100             (BSEC)   */
 #define LORA_PL_OFF_BME_TEMP     12  /* i16, degC x100            (BSEC)   */
 #define LORA_PL_OFF_BME_PRESS    14  /* u16, hPa x10              (BSEC)   */
-#define LORA_PL_OFF_BME_STAB     16  /* u8, 0 = warming up, 1 = stable     */
+#define LORA_PL_OFF_BME_STAB     16  /* u16, 0 = warming up, 1 = stable     */
 #define LORA_PL_OFF_VBATT        18
 #define LORA_PL_OFF_NODEID       20
 #endif /* LORA_LINK_H */

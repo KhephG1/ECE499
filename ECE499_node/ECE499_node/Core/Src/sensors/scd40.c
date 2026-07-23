@@ -35,6 +35,7 @@
  */
 
 #include "scd40.h"
+#include "gpio.h"
 
 /**
  * @brief chip information definition
@@ -1078,6 +1079,9 @@ uint8_t scd4x_start_low_power_periodic_measurement(scd4x_handle_t *handle)
     if (res != 0)                                                                            /* check result */
     {
         handle->debug_print("scd4x: start low power periodic measurement failed.\n");        /* start low power periodic measurement failed */
+        HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET);
+        HAL_Delay(1000);
+        HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
        
         return 1;                                                                            /* return error */
     }

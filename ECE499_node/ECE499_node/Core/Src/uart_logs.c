@@ -1,7 +1,6 @@
 #include "uart_logs.h"
 #include <stdarg.h>
 #include <stdio.h>
-#include "usart.h"
 
 #define MAX_LOG_MSG (256)
 #define LOG_LEVEL_NONE
@@ -95,7 +94,7 @@ void vlog_debug(const char* message, va_list args) {
         if (bytes_written >= MAX_LOG_MSG) {
             bytes_written = MAX_LOG_MSG - 1;
         }
-        HAL_UART_Transmit(&hlpuart1, (uint8_t*)buf, bytes_written, HAL_MAX_DELAY);
+        //HAL_UART_Transmit(&hlpuart1, (uint8_t*)buf, bytes_written, HAL_MAX_DELAY);
     }
 }
 void log_debug(const char* message, ...) {
@@ -108,7 +107,7 @@ void log_debug(const char* message, ...) {
         
         // Fixed: Protect against string truncation buffer overruns
         if (bytes_written >= MAX_LOG_MSG) bytes_written = MAX_LOG_MSG - 1;
-        HAL_UART_Transmit(&hlpuart1, (uint8_t*)buf, bytes_written, HAL_MAX_DELAY);
+        //HAL_UART_Transmit(&hlpuart1, (uint8_t*)buf, bytes_written, HAL_MAX_DELAY);
     }
 }
 
@@ -121,7 +120,7 @@ void log_info(const char* message, ...) {
         va_end(args);
         
         if (bytes_written >= MAX_LOG_MSG) bytes_written = MAX_LOG_MSG - 1;
-        HAL_UART_Transmit(&hlpuart1, (uint8_t*)buf, bytes_written, HAL_MAX_DELAY);
+        //HAL_UART_Transmit(&hlpuart1, (uint8_t*)buf, bytes_written, HAL_MAX_DELAY);
     }
 }
 
@@ -134,6 +133,6 @@ void log_error(const char* message, ...) {
         va_end(args);
         
         if (bytes_written >= MAX_LOG_MSG) bytes_written = MAX_LOG_MSG - 1;
-        HAL_UART_Transmit(&hlpuart1, (uint8_t*)buf, bytes_written, HAL_MAX_DELAY);
+        //HAL_UART_Transmit(&hlpuart1, (uint8_t*)buf, bytes_written, HAL_MAX_DELAY);
     }
 }

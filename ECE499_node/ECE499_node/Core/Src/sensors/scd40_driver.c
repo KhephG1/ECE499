@@ -37,7 +37,7 @@ uint8_t init_scd40(scd4x_handle_t *gs_handle, scd4x_t type, float cal_pressure, 
     }
     
     /* start */
-    result = scd4x_perform_self_test(gs_handle, &result);
+    scd4x_perform_self_test(gs_handle, &result);
     if(result){
         scd4x_interface_debug_print("scd4x: self test failed.\r\n");
     }
