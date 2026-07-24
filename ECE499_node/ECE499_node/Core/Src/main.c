@@ -56,7 +56,7 @@
 #define SENSOR_WAIT_TIMEOUT_MS (1000)
 #define PAYLOAD_LEN           (LORA_LINK_PAYLOAD_LEN)
 #define ADC_CODE_MAX (1 << 14)
-#define NODE_ID (1) 
+#define NODE_ID (3) 
 
 /*
  * Radio configuration.
@@ -363,7 +363,7 @@ int main(void)
   //initialize the scd40
 
   if(init_scd40(&scd40, 0, 0.0,0.0) != 0){
-    Error_Handler();
+    //Error_Handler();
   }
   HAL_Delay(100);
   if(bme680_init(&bme680, BME68X_I2C_INTF) != BSEC_OK){
