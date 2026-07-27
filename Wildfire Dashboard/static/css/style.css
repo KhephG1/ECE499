@@ -1,0 +1,766 @@
+/* ================================
+   GLOBAL
+================================ */
+
+
+* {
+
+    box-sizing: border-box;
+
+}
+
+
+
+body {
+
+    margin: 0;
+
+    font-family: Arial, Helvetica, sans-serif;
+
+    background: #f2f4f7;
+
+    color: #222;
+
+}
+
+
+
+
+
+/* ================================
+   HEADER
+================================ */
+
+
+.header {
+
+    background: #1f2933;
+
+    color: white;
+
+    padding: 18px;
+
+    text-align: center;
+
+}
+
+
+
+.header h1 {
+
+    margin: 0;
+
+    font-size: 28px;
+
+}
+
+
+
+
+
+
+
+/* ================================
+   STATUS BAR
+================================ */
+
+
+.status-bar {
+
+    display: flex;
+
+    gap: 15px;
+
+    padding: 15px;
+
+    background: white;
+
+    border-bottom: 1px solid #ccc;
+
+}
+
+
+
+
+
+.status-card {
+
+    flex: 1;
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 15px;
+
+    background: #fafafa;
+
+    padding: 15px;
+
+    border-radius: 10px;
+
+    border: 1px solid #ddd;
+
+}
+
+
+
+
+
+.status-card strong {
+
+    font-size: 28px;
+
+    display: block;
+
+}
+
+
+
+
+
+.status-card p {
+
+    margin: 3px 0 0 0;
+
+    color: #666;
+
+}
+
+
+
+
+
+.status-icon {
+
+    font-size: 32px;
+
+}
+
+
+
+
+
+
+
+
+
+/* ================================
+   MAIN AREA
+================================ */
+
+
+.main-container {
+
+    display: flex;
+
+    height: 65vh;
+
+}
+
+
+
+
+
+
+
+
+
+/* ================================
+   MAP
+================================ */
+
+
+.map-container {
+
+    flex: 5;
+
+    padding: 15px;
+
+}
+
+
+
+
+
+#map {
+
+    height: 100%;
+
+    width: 100%;
+
+    border-radius: 12px;
+
+    box-shadow: 0 3px 8px rgba(0,0,0,0.25);
+
+}
+
+
+
+
+
+
+
+
+
+/* ================================
+   NODE PANEL
+================================ */
+
+
+.node-panel {
+
+    flex: 1.6;
+
+    background: white;
+
+    padding: 15px;
+
+    overflow-y: auto;
+
+    border-left: 1px solid #ccc;
+
+}
+
+
+
+
+
+.node-panel h2 {
+
+    margin-top: 0;
+
+}
+
+
+
+
+
+
+
+
+
+/* ================================
+   CARDS
+================================ */
+
+
+.card {
+
+    background: white;
+
+    border-radius: 10px;
+
+    padding: 15px;
+
+    margin-bottom: 15px;
+
+    border: 1px solid #ddd;
+
+}
+
+
+
+
+
+.card h3 {
+
+    margin-top: 0;
+
+}
+
+
+
+
+
+
+
+
+
+/* ================================
+   NODE HEADER
+================================ */
+
+
+.node-header-card {
+
+    text-align: center;
+
+}
+
+
+
+
+
+.node-header-card h3 {
+
+    font-size: 28px;
+
+    margin-bottom: 15px;
+
+}
+
+
+
+
+
+
+
+
+
+/* ================================
+   RISK BADGE
+================================ */
+
+
+.risk-badge {
+
+    padding: 10px;
+
+    border-radius: 8px;
+
+    font-size: 22px;
+
+    font-weight: bold;
+
+    color: white;
+
+    transition: 0.3s;
+
+}
+
+
+
+
+
+.risk-normal {
+
+    background: green;
+
+}
+
+
+
+
+
+.risk-warning {
+
+    background: orange;
+
+}
+
+
+
+
+
+.risk-danger {
+
+    background: red;
+
+}
+
+
+
+
+
+
+
+
+
+/* ================================
+   DATA ROWS
+================================ */
+
+
+.data-row {
+
+    display: flex;
+
+    justify-content: space-between;
+
+    padding: 7px 0;
+
+    border-bottom: 1px solid #eee;
+
+}
+
+
+
+
+
+.data-row:last-child {
+
+    border-bottom: none;
+
+}
+
+
+
+
+
+
+
+
+
+/* ================================
+   BUTTONS
+================================ */
+
+
+.more-data-button {
+
+    width: 100%;
+
+    padding: 14px;
+
+    background: #1f2933;
+
+    color: white;
+
+    border: none;
+
+    border-radius: 8px;
+
+    font-size: 16px;
+
+    cursor: pointer;
+
+}
+
+
+
+
+
+.more-data-button:hover {
+
+    background: #374151;
+
+}
+
+
+
+
+
+
+
+
+
+/* ================================
+   LOWER SECTION
+================================ */
+
+
+.bottom-container {
+
+    display: flex;
+
+    min-height: 30vh;
+
+}
+
+
+
+
+
+.node-overview {
+
+    flex: 1;
+
+    background: white;
+
+    padding: 15px;
+
+    overflow-y: auto;
+
+}
+
+
+
+
+
+
+
+.log-panel {
+
+    flex: 2;
+
+    background: #111827;
+
+    color: white;
+
+    padding: 15px;
+
+}
+
+
+
+
+
+
+
+#message-log {
+
+    font-family: monospace;
+
+    background: black;
+
+    padding: 15px;
+
+    height: 200px;
+
+    overflow-y: auto;
+
+    border-radius: 8px;
+
+}
+
+
+
+
+
+
+
+
+
+/* ================================
+   NODE LIST
+================================ */
+
+
+.node-item {
+
+    padding: 14px;
+
+    margin-bottom: 10px;
+
+    border-radius: 10px;
+
+    cursor: pointer;
+
+    border: 1px solid #ddd;
+
+    background: #fafafa;
+
+    transition: 0.15s;
+
+}
+
+
+
+
+
+.node-item:hover {
+
+    transform: scale(1.02);
+
+}
+
+
+
+
+
+.node-title {
+
+    font-size: 18px;
+
+    margin-bottom: 8px;
+
+}
+
+
+
+
+
+.node-normal {
+
+    border-left: 7px solid green;
+
+}
+
+
+
+
+
+.node-warning {
+
+    border-left: 7px solid orange;
+
+}
+
+
+
+
+
+.node-danger {
+
+    border-left: 7px solid red;
+
+}
+
+
+
+
+
+
+
+
+
+/* ================================
+   HISTORICAL PAGE
+================================ */
+
+
+#more-data-page {
+
+    display: none;
+
+    padding: 25px;
+
+}
+
+
+
+
+
+#history-title {
+
+    margin-top: 0;
+
+}
+
+
+
+
+
+.chart-card {
+
+    background: white;
+
+    border-radius: 10px;
+
+    padding: 20px;
+
+    margin: 20px 0;
+
+    border: 1px solid #ddd;
+
+    box-shadow: 0 3px 8px rgba(0,0,0,0.12);
+
+}
+
+
+
+
+
+.chart-card h2 {
+
+    margin-top: 0;
+
+    margin-bottom: 15px;
+
+}
+
+
+
+
+
+.chart-card canvas {
+
+    width: 100% !important;
+
+    height: 300px !important;
+
+}
+
+
+
+
+
+
+
+
+
+/* ================================
+   MOBILE SUPPORT
+================================ */
+
+
+@media(max-width: 900px) {
+
+
+    .main-container {
+
+        flex-direction: column;
+
+        height: auto;
+
+    }
+
+
+
+    .node-panel {
+
+        border-left: none;
+
+    }
+
+
+
+    .status-bar {
+
+        flex-direction: column;
+
+    }
+
+
+}
+
+/* ================================
+   HISTORY TOOLBAR
+================================ */
+
+.history-toolbar {
+
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: center;
+
+    margin-bottom: 25px;
+
+    gap: 20px;
+
+}
+
+.history-toolbar label {
+
+    display: block;
+
+    margin-bottom: 6px;
+
+    font-weight: bold;
+
+}
+
+.history-toolbar select {
+
+    padding: 10px;
+
+    border-radius: 8px;
+
+    border: 1px solid #ccc;
+
+    font-size: 15px;
+
+    min-width: 180px;
+
+}
+
+.history-toolbar .more-data-button {
+
+    width: auto;
+
+    padding: 12px 24px;
+
+}
