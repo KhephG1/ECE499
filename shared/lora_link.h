@@ -51,7 +51,7 @@
  * Scaled integers are used instead of floats to keep the packet small; divide
  * by the scale noted on each field to recover the physical value.
  */
-#define LORA_LINK_PAYLOAD_LEN    17
+#define LORA_LINK_PAYLOAD_LEN    21
 
 #define LORA_PL_OFF_SCD_CO2      0   /* u16, ppm                  (SCD40)  */
 #define LORA_PL_OFF_SCD_TEMP     2   /* i16, degC x100            (SCD40)  */
@@ -61,6 +61,7 @@
 #define LORA_PL_OFF_BME_HUM      10  /* i16, %RH x100             (BSEC)   */
 #define LORA_PL_OFF_BME_TEMP     12  /* i16, degC x100            (BSEC)   */
 #define LORA_PL_OFF_BME_PRESS    14  /* u16, hPa x10              (BSEC)   */
-#define LORA_PL_OFF_BME_STAB     16  /* u8, 0 = warming up, 1 = stable     */
-
+#define LORA_PL_OFF_BME_STAB     16  /* u16, 0 = warming up, 1 = stable     */
+#define LORA_PL_OFF_VBATT        18
+#define LORA_PL_OFF_NODEID       20
 #endif /* LORA_LINK_H */

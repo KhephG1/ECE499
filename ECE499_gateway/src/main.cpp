@@ -42,7 +42,7 @@ bool     sensorValid = false;
 uint16_t scdCo2, bmeCo2eq, bmeVoc, bmePress;
 int16_t  scdTemp, scdHum, bmeTemp, bmeHum;
 uint8_t  bmeStab;
-
+uint16_t vbatt, node_id;
 WebServer server(80);
 
 // The payload is little-endian regardless of the host, so it is unpacked byte
@@ -65,6 +65,8 @@ static void decodeSensorPacket(const uint8_t *p) {
   bmeTemp  = get_i16(&p[LORA_PL_OFF_BME_TEMP]);
   bmePress = get_u16(&p[LORA_PL_OFF_BME_PRESS]);
   bmeStab  = p[LORA_PL_OFF_BME_STAB];
+  vbatt = get_u16(&p[LORA_PL_OFF_VBATT]);
+  node_id = get_u16(&p[LORA_PL_OFF_NODEID]);
   sensorValid = true;
 }
 
@@ -98,6 +100,8 @@ void handleRoot() {
     html += row("Humidity (BME680)", String(bmeHum / 100.0, 2) + " %RH");
     html += row("Pressure (BME680)", String(bmePress / 10.0, 1) + " hPa");
     html += row("BSEC stabilized", bmeStab ? "yes" : "warming up");
+    html += row("Battery voltage:", String(vbatt / 100.0,2) + "V");
+    html += row("Node ID:", String(node_id));
     html += "</table>";
   } else {
     html += "<p><i>No sensor packet decoded yet.</i></p>";
