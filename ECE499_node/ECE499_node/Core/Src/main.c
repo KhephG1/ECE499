@@ -37,7 +37,9 @@
 #include <stddef.h>
 #include <string.h>
 
+#include "stm32u575xx.h"
 #include "stm32u5xx_hal.h"
+#include "stm32u5xx_hal_gpio.h"
 #include "stm32u5xx_hal_lptim.h"
 #include "sx126x.h"
 #include "uart_logs.h"
@@ -53,10 +55,10 @@
 /* USER CODE BEGIN PD */
 #define TIMER_ARR_15SECONDS      (61440) //(32.768kHz / 8) / 61440 gives a 15.3 second period
 #define TIMER_ARR_5SECONDS    (20480)
-#define SENSOR_WAIT_TIMEOUT_MS (1000)
+#define SENSOR_WAIT_TIMEOUT_MS (200)
 #define PAYLOAD_LEN           (LORA_LINK_PAYLOAD_LEN)
 #define ADC_CODE_MAX (1 << 14)
-#define NODE_ID (3) 
+#define NODE_ID (2) 
 
 /*
  * Radio configuration.
@@ -206,12 +208,10 @@ static bool radio_transmit(const uint8_t *payload, uint8_t len)
         if (irq & SX126X_IRQ_TIMEOUT)
         {
             sx126x_clear_irq_status(radio_ctx, SX126X_IRQ_TIMEOUT);
-            log_error("radio: tx timeout\r\n");
             return false;
         }
     }
 
-    log_error("radio: tx never completed\r\n");
     return false;
 }
 
@@ -293,15 +293,8 @@ void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin)
     GPIO_PinState state = HAL_GPIO_ReadPin(GPIOB,GPIO_EXTI4_Pin);
     HAL_GPIO_WritePin(GPIOD, GPIO_PIN_5, state);
   } else if(GPIO_Pin==GPIO_PIN_2){
-  //invalid battery volatge to indicate vbatok has gone low
-   battery_voltage  = 0;
-   uint8_t payload[PAYLOAD_LEN];
-  //  build_payload(payload, bme680_data, noutputs);
-  //  //make an emergency transmission to indicate low battery state to gateway
-  //  if (radio_ctx !=NULL && radio_transmit(payload, PAYLOAD_LEN))
-  //  {
-  //      log_info("radio: tx ok\r\n");
-  //  }
+    //flash LED to indicate low battery to user
+    HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_6);
   } else {
       __NOP();
   }
@@ -310,8 +303,18 @@ void HAL_LPTIM_AutoReloadMatchCallback(LPTIM_HandleTypeDef *hlptim)
 {
 	if(hlptim == &hlptim1)
 	{
+    //no action needed in callback
     __NOP();
 	}
+}
+
+void blink_status(int count){
+  for(int i = 0; i < count; i++){
+    HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET);
+    HAL_Delay(300);
+    HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
+    HAL_Delay(300);
+  }
 }
 
 /* USER CODE END 0 */
@@ -357,28 +360,48 @@ int main(void)
   MX_LPTIM1_Init();
   /* USER CODE BEGIN 2 */
   //status indicator
-  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6,GPIO_PIN_RESET);
-  HAL_Delay(500);
-  HAL_GPIO_WritePin(GPIOC,  GPIO_PIN_6, GPIO_PIN_SET);
+  for(int i = 0; i < 8; i++){
+    HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6,GPIO_PIN_RESET);
+    HAL_Delay(100);
+    HAL_GPIO_WritePin(GPIOC,  GPIO_PIN_6, GPIO_PIN_SET);
+    HAL_Delay(100);
+  }
   //initialize the scd40
 
-  if(init_scd40(&scd40, 0, 0.0,0.0) != 0){
-    //Error_Handler();
+  int count = 0;
+  while(init_scd40(&scd40, 0, 0.0,0.0) != 0){
+    blink_status(3);
+    HAL_Delay(2000);
+    count++;
+    if(count > 2){
+      break;
+    }
   }
   HAL_Delay(100);
-  if(bme680_init(&bme680, BME68X_I2C_INTF) != BSEC_OK){
-    Error_Handler();
-  }
 
+  count = 0; 
+  while(bme680_init(&bme680, BME68X_I2C_INTF) != BSEC_OK){
+    blink_status(4);
+    HAL_Delay(2000);
+    count++;
+    if(count > 2){
+      break;
+    }
+  }
   // LoRa radio bring-up. MX_GPIO_Init and MX_SPI1_Init have already set up the
   // pins and the SPI bus the HAL port drives, so the radio can be configured
   // directly from here.
-  if (!radio_init())
+
+  count = 0;
+  while(!radio_init())
   {
-    log_error("radio: init failed\r\n");
-    Error_Handler();
+    blink_status(5);
+    HAL_Delay(2000);
+    count++;
+    if(count > 2){
+      break;
+    }
   }
-  log_info("radio: init ok\r\n");
   //calibrate ADC
   HAL_ADCEx_Calibration_Start(&hadc1,ADC_CALIB_OFFSET,ADC_SINGLE_ENDED );
   __HAL_RCC_LPTIM1_CLK_SLEEP_ENABLE();
@@ -392,57 +415,34 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-   // Wake cycle: poll the sensors at a 100ms cadence until the SCD40's
-   // periodic measurement is ready (or we give up after
-   // SENSOR_WAIT_TIMEOUT_MS), then TX one packet and idle until the next
-   // cycle. Sensors are read before the payload is built so the first packet
-   // out carries real readings rather than zeros.
-   uint32_t cycle_start = HAL_GetTick();
-   uint8_t scd_status;
    uint8_t bme_noutputs = 0;
-
-   do
-   {
-       // BSEC reads noutputs as the capacity of bme680_data on the way in and
-       // overwrites it with the number of outputs it produced, so it has to be
-       // reset before every call or the capacity ratchets down.
-       noutputs = BME680_MAX_OUTPUTS;
-       if (bme680_step(&bme680, bme680_data, &noutputs) == BME68X_OK)
-       {
-           bme_noutputs = noutputs;
-       }
-
-       scd_status = scd4x_basic_read(&scd40);
-       if (scd_status == 0)
-       {
-
-           break;
-       }
-       //read the battery voltage
-       if(HAL_ADC_Start(&hadc1) == HAL_OK){
-            HAL_ADC_PollForConversion(&hadc1, 1000);
-            uint32_t adc_code = HAL_ADC_GetValue(&hadc1);
-            HAL_ADC_Stop(&hadc1);      
-            //multiply by two since voltage divider divides actual voltage in half  
-            battery_voltage = ((adc_code * 3.3f) / ADC_CODE_MAX) * 2.0f;
-       };
-       HAL_Delay(100);
-   } while (HAL_GetTick() - cycle_start < SENSOR_WAIT_TIMEOUT_MS);
-
-   if (scd_status != 0)
-   {
-       // Send anyway: the BME680 fields are still fresh and the SCD40 fields
-       // fall back to the previous cycle's readings.
-       log_error("scd40: no measurement this cycle\r\n");
-   }
-
+    // BSEC reads noutputs as the capacity of bme680_data on the way in and
+    // overwrites it with the number of outputs it produced, so it has to be
+    // reset before every call or the capacity ratchets down.
+    noutputs = BME680_MAX_OUTPUTS;
+    if (bme680_step(&bme680, bme680_data, &noutputs) == BME68X_OK)
+    {
+        bme_noutputs = noutputs;
+    }
+    //read scd40
+    scd4x_basic_read(&scd40);
+    //read the battery voltage
+    if(HAL_ADC_Start(&hadc1) == HAL_OK){
+        HAL_ADC_PollForConversion(&hadc1, 1000);
+        uint32_t adc_code = HAL_ADC_GetValue(&hadc1);
+        HAL_ADC_Stop(&hadc1);      
+        //multiply by two since voltage divider divides actual voltage in half  
+        battery_voltage = ((adc_code * 3.3f) / ADC_CODE_MAX) * 2.0f;
+    };
+   HAL_Delay(100);
    uint8_t payload[PAYLOAD_LEN];
    build_payload(payload, bme680_data, bme_noutputs);
    if (radio_transmit(payload, PAYLOAD_LEN))
    {
-       log_info("radio: tx ok\r\n");
+    blink_status(2);
    }
-      /* mask the EXTI wakeup requests, not just the NVIC */
+
+  /* mask the EXTI wakeup requests, not just the NVIC */
    EXTI->IMR1 &= ~(GPIO_EXTI4_Pin | GPIO_PIN_2);
    __HAL_GPIO_EXTI_CLEAR_IT(GPIO_EXTI4_Pin);
    __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_2);
