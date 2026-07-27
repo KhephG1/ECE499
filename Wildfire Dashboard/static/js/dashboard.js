@@ -64,7 +64,36 @@ L.tileLayer(
 // ===================================
 
 
+// A node that has stopped reporting is
+// shown as Offline instead of its last
+// known risk level
+
+function nodeStatus(node) {
+
+
+    if(!node.online) {
+
+        return "Offline";
+
+    }
+
+
+    return node.risk;
+
+}
+
+
+
+
+
 function riskColor(risk) {
+
+
+    if (risk === "Offline") {
+
+        return "#9ca3af";
+
+    }
 
 
     if (risk === "Normal") {
@@ -97,6 +126,13 @@ function riskColor(risk) {
 
 
 function riskClass(risk) {
+
+
+    if (risk === "Offline") {
+
+        return "risk-offline";
+
+    }
 
 
     if (risk === "Normal") {
@@ -196,18 +232,22 @@ function updatePanel(node) {
 
 
 
+    let status = nodeStatus(node);
+
+
+
     let badge =
         document.getElementById("risk-badge");
 
 
 
     badge.innerHTML =
-        node.risk;
+        status;
 
 
 
     badge.className =
-        "risk-badge " + riskClass(node.risk);
+        "risk-badge " + riskClass(status);
 
 
 }
@@ -266,25 +306,36 @@ function createNodeList() {
 
 
 
+        let status = nodeStatus(node);
+
+
+
         let icon = "⚪";
 
 
 
-        if(node.risk === "Normal") {
+        if(status === "Offline") {
+
+            icon = "⚫";
+
+        }
+
+
+        else if(status === "Normal") {
 
             icon = "🟢";
 
         }
 
 
-        else if(node.risk === "Warning") {
+        else if(status === "Warning") {
 
             icon = "🟡";
 
         }
 
 
-        else if(node.risk === "Danger") {
+        else if(status === "Danger") {
 
             icon = "🔴";
 
@@ -308,7 +359,7 @@ function createNodeList() {
             </div>
 
 
-            Risk: ${node.risk}
+            Risk: ${status}
 
             <br>
 
@@ -325,7 +376,7 @@ function createNodeList() {
 
         item.classList.add(
 
-            "node-" + node.risk.toLowerCase()
+            "node-" + status.toLowerCase()
 
         );
 
@@ -404,6 +455,10 @@ function updateStatusBar() {
 
     let dangers = 0;
 
+    let online = 0;
+
+    let offline = 0;
+
 
 
     nodes.forEach(node => {
@@ -424,6 +479,21 @@ function updateStatusBar() {
         }
 
 
+
+        if(node.online) {
+
+            online++;
+
+        }
+
+
+        else {
+
+            offline++;
+
+        }
+
+
     });
 
 
@@ -431,7 +501,11 @@ function updateStatusBar() {
 
 
     document.getElementById("online-count").innerHTML =
-        nodes.length;
+        online;
+
+
+    document.getElementById("offline-count").innerHTML =
+        offline;
 
 
     document.getElementById("warning-count").innerHTML =
@@ -551,11 +625,47 @@ function updateMarkers() {
 
 
 
+        marker.setLatLng([
+
+            node.latitude,
+
+            node.longitude
+
+        ]);
+
+
+
+
+        let status = nodeStatus(node);
+
+
+
+
+        // Offline nodes are greyed out
+
         marker.setStyle({
 
             fillColor:
 
-                riskColor(node.risk)
+                riskColor(status),
+
+
+            color:
+
+                status === "Offline"
+
+                ? "#6b7280"
+
+                : "black",
+
+
+            fillOpacity:
+
+                status === "Offline"
+
+                ? 0.45
+
+                : 0.85
 
         });
 
@@ -574,7 +684,12 @@ function updateMarkers() {
             <br>
 
             Risk:
-            ${node.risk}
+            ${status}
+
+            <br>
+
+            Last update:
+            ${node.last_update}
 
             `
 
@@ -627,6 +742,9 @@ async function loadNodes() {
         updateStatusBar();
 
 
+        updateNodeSelect();
+
+
 
 
 
@@ -677,9 +795,11 @@ async function loadNodes() {
         console.error(error);
 
 
-        addMessage(
+        setStatus(
 
-            "Failed to update node data"
+            "Failed to update node data",
+
+            "error"
 
         );
 
@@ -698,24 +818,19 @@ async function loadNodes() {
 
 
 // ===================================
-// MESSAGE LOG
+// NODE LOCATION FORM
 // ===================================
 
 
-function addMessage(message) {
+function setStatus(message, type) {
 
 
-    let log =
-        document.getElementById("message-log");
-
-
-
-    let entry =
-        document.createElement("p");
+    let status =
+        document.getElementById("location-status");
 
 
 
-    entry.innerHTML =
+    status.innerHTML =
 
         new Date().toLocaleTimeString()
 
@@ -729,14 +844,205 @@ function addMessage(message) {
 
 
 
+    status.className =
+        "form-status " + type;
 
-    log.appendChild(entry);
+
+}
 
 
 
-    log.scrollTop =
 
-        log.scrollHeight;
+
+function updateNodeSelect() {
+
+
+    let select =
+        document.getElementById("location-node");
+
+
+
+    let ids = nodes.map(
+        n => n.device_id
+    );
+
+
+
+    // Only rebuild when the node list changes,
+    // so polling does not clobber the selection
+
+    if(select.dataset.ids === ids.join(",")) {
+
+        return;
+
+    }
+
+
+
+    let previous = select.value;
+
+
+    select.innerHTML =
+        "<option value=''>Select a node</option>";
+
+
+
+    nodes.forEach(node => {
+
+
+        let option =
+            document.createElement("option");
+
+
+        option.value =
+            node.device_id;
+
+
+        option.innerHTML =
+            "WF-" + node.device_id;
+
+
+        select.appendChild(option);
+
+
+    });
+
+
+
+    select.value = previous;
+
+
+    select.dataset.ids = ids.join(",");
+
+
+}
+
+
+
+
+
+async function submitNodeLocation(event) {
+
+
+    event.preventDefault();
+
+
+
+    let deviceId =
+        document.getElementById("location-node").value;
+
+
+    let latitude =
+        document.getElementById("location-latitude").value;
+
+
+    let longitude =
+        document.getElementById("location-longitude").value;
+
+
+
+
+    try {
+
+
+        let response = await fetch(
+
+            "/api/node-location",
+
+            {
+
+                method: "POST",
+
+                headers: {
+
+                    "Content-Type": "application/json"
+
+                },
+
+                body: JSON.stringify({
+
+                    device_id: deviceId,
+
+                    latitude: latitude,
+
+                    longitude: longitude
+
+                })
+
+            }
+
+        );
+
+
+
+        let result = await response.json();
+
+
+
+        if(!result.success) {
+
+
+            setStatus(
+
+                result.error,
+
+                "error"
+
+            );
+
+
+            return;
+
+
+        }
+
+
+
+        setStatus(
+
+            "WF-" +
+
+            result.device_id +
+
+            " moved to " +
+
+            result.latitude +
+
+            ", " +
+
+            result.longitude,
+
+            "success"
+
+        );
+
+
+
+        // Show the new position without waiting
+        // for a page refresh
+
+        await loadNodes();
+
+
+    }
+
+
+    catch(error) {
+
+
+        console.error(error);
+
+
+        setStatus(
+
+            "Failed to save node location",
+
+            "error"
+
+        );
+
+
+    }
 
 
 }

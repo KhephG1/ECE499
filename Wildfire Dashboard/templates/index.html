@@ -117,6 +117,31 @@
     <div class="status-card">
 
         <div class="status-icon">
+            ⚫
+        </div>
+
+        <div>
+
+            <strong id="offline-count">
+                0
+            </strong>
+
+            <p>
+                Offline Nodes
+            </p>
+
+        </div>
+
+    </div>
+
+
+
+
+
+
+    <div class="status-card">
+
+        <div class="status-icon">
             🕒
         </div>
 
@@ -501,28 +526,92 @@ Node Overview
 
 
 
-<section class="log-panel">
+<section class="location-panel">
 
 
 <h2>
-System Messages
+Set Node Location
 </h2>
 
 
 
-<div id="message-log">
-
-<p>
-Dashboard initialized
-</p>
+<form id="location-form"
+      onsubmit="submitNodeLocation(event)">
 
 
-<p>
-Waiting for node data...
-</p>
+<div class="form-row">
 
+    <label for="location-node">
+        Node
+    </label>
+
+    <select id="location-node"
+            required>
+
+        <option value="">
+            Select a node
+        </option>
+
+    </select>
 
 </div>
+
+
+
+
+<div class="form-row">
+
+    <label for="location-latitude">
+        Latitude
+    </label>
+
+    <input id="location-latitude"
+           type="number"
+           step="any"
+           min="-90"
+           max="90"
+           placeholder="48.46231"
+           required>
+
+</div>
+
+
+
+
+<div class="form-row">
+
+    <label for="location-longitude">
+        Longitude
+    </label>
+
+    <input id="location-longitude"
+           type="number"
+           step="any"
+           min="-180"
+           max="180"
+           placeholder="-123.31245"
+           required>
+
+</div>
+
+
+
+
+<button type="submit"
+        class="more-data-button">
+
+    Save Location
+
+</button>
+
+
+</form>
+
+
+
+<p id="location-status"
+   class="form-status">
+</p>
 
 
 

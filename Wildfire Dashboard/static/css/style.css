@@ -363,6 +363,16 @@ body {
 
 
 
+.risk-offline {
+
+    background: #9ca3af;
+
+}
+
+
+
+
+
 
 
 
@@ -480,7 +490,12 @@ body {
 
 
 
-.log-panel {
+/* ================================
+   NODE LOCATION FORM
+================================ */
+
+
+.location-panel {
 
     flex: 2;
 
@@ -494,23 +509,125 @@ body {
 
 
 
+.location-panel h2 {
+
+    margin-top: 0;
+
+}
 
 
 
 
-#message-log {
 
-    font-family: monospace;
+#location-form {
 
-    background: black;
+    display: flex;
+
+    flex-wrap: wrap;
+
+    align-items: flex-end;
+
+    gap: 15px;
+
+    background: #1f2933;
 
     padding: 15px;
 
-    height: 200px;
+    border-radius: 8px;
 
-    overflow-y: auto;
+}
+
+
+
+
+
+.form-row {
+
+    flex: 1;
+
+    min-width: 160px;
+
+}
+
+
+
+.form-row label {
+
+    display: block;
+
+    margin-bottom: 6px;
+
+    font-weight: bold;
+
+    font-size: 14px;
+
+}
+
+
+
+.form-row select,
+
+.form-row input {
+
+    width: 100%;
+
+    padding: 10px;
 
     border-radius: 8px;
+
+    border: 1px solid #ccc;
+
+    font-size: 15px;
+
+}
+
+
+
+#location-form .more-data-button {
+
+    width: auto;
+
+    padding: 12px 24px;
+
+    background: #2563eb;
+
+}
+
+
+
+#location-form .more-data-button:hover {
+
+    background: #1d4ed8;
+
+}
+
+
+
+
+
+.form-status {
+
+    min-height: 20px;
+
+    margin: 12px 0 0 0;
+
+    font-family: monospace;
+
+}
+
+
+
+.form-status.success {
+
+    color: #4ade80;
+
+}
+
+
+
+.form-status.error {
+
+    color: #f87171;
 
 }
 
@@ -594,6 +711,18 @@ body {
 .node-danger {
 
     border-left: 7px solid red;
+
+}
+
+
+
+
+
+.node-offline {
+
+    border-left: 7px solid #9ca3af;
+
+    color: #6b7280;
 
 }
 

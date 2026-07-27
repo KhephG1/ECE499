@@ -76,6 +76,57 @@ def add_device(
 
 
 
+def update_device_location(
+    device_id,
+    latitude,
+    longitude
+):
+
+    conn = get_connection()
+
+    cursor = conn.cursor()
+
+
+
+    cursor.execute(
+
+        """
+
+        UPDATE devices
+
+        SET
+            latitude = ?,
+
+            longitude = ?
+
+
+        WHERE device_id = ?
+
+        """,
+
+        (
+            latitude,
+            longitude,
+            str(device_id)
+        )
+
+    )
+
+
+    updated = cursor.rowcount
+
+
+    conn.commit()
+
+    conn.close()
+
+
+    return updated > 0
+
+
+
+
+
 def get_devices():
 
     conn = get_connection()

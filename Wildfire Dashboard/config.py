@@ -33,3 +33,16 @@ BAUD_RATE = 115200
 HOST = "0.0.0.0"
 
 PORT = 5000
+
+
+
+
+# -----------------------------
+# NODE STATUS
+# -----------------------------
+
+
+# Seconds without a reading before a
+# node is considered offline
+
+OFFLINE_THRESHOLD = 30

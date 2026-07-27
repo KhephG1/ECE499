@@ -1,11 +1,18 @@
 from database.queries import get_latest_nodes
 from datetime import datetime
 
+from config import OFFLINE_THRESHOLD
+
 # ===================================
 # FORMAT DATABASE DATA FOR DASHBOARD
 # ===================================
 
-def time_since(timestamp):
+def seconds_since(timestamp):
+
+    """
+    Age of a reading, in seconds.
+    """
+
 
     update_time = datetime.strptime(
         timestamp,
@@ -13,11 +20,14 @@ def time_since(timestamp):
     )
 
 
-    seconds = (
+    return (
         datetime.now() - update_time
     ).total_seconds()
 
 
+
+
+def time_since(seconds):
 
     if seconds < 60:
 
@@ -55,6 +65,19 @@ def get_nodes():
 
 
     for row in rows:
+
+
+        # ===============================
+        # ONLINE / OFFLINE STATUS
+        # ===============================
+
+        age = seconds_since(
+            row["timestamp"]
+        )
+
+
+        online = age <= OFFLINE_THRESHOLD
+
 
 
         node = {
@@ -143,7 +166,18 @@ def get_nodes():
             # Time
 
             "last_update":
-                time_since(row["timestamp"])
+                time_since(age),
+
+
+            "seconds_since_update":
+                int(age),
+
+
+
+            # Status
+
+            "online":
+                online
 
 
         }
