@@ -1,129 +1,196 @@
+#include <RadioLib.h>
 
+// Heltec WiFi LoRa 32 V3 - SX1262 Pin Definitions
+const int PIN_NSS   = 8;
+const int PIN_DIO1  = 14;
+const int PIN_NRST  = 12;
+const int PIN_BUSY  = 13;
 
+// On-board LED (Active High)
+const int LED_PIN = 35;
 
-/**
- * LoRa RX/TX + WiFi AP hosting a hello-world page.
- */
+// Create radio instance
+SX1262 radio = new Module(PIN_NSS, PIN_DIO1, PIN_NRST, PIN_BUSY);
 
-#define HELTEC_POWER_BUTTON
-#include <heltec_unofficial.h>
-#include <WiFi.h>
-#include <WebServer.h>
+// --------------------------------------------------
+// Configuration
+// --------------------------------------------------
 
-#define PAUSE               300
-#define FREQUENCY           905.2
-#define BANDWIDTH           250.0
-#define SPREADING_FACTOR    9
-#define TRANSMIT_POWER      0
+#define SERIAL_BAUD 115200
 
-#define AP_SSID             "HeltecBase"
-#define AP_PASS             "lora1234"   // >= 8 chars, or use NULL for open
+// LoRa parameters (MUST match transmitter!)
+const float   LORA_FREQ_MHZ     = 915.0;
+const float   LORA_BW_KHZ       = 125.0;
+const uint8_t LORA_SF           = 9;
+const uint8_t LORA_CR           = 7;      // 4/7
+const uint8_t LORA_SYNC_WORD    = 0x12;   // Private network
+const int8_t  LORA_POWER_DBM    = 10;
+const uint8_t LORA_CURRENT_MA   = 100;
 
-String rxdata;
-volatile bool rxFlag = false;
-long counter = 0;
-uint64_t last_tx = 0;
-uint64_t tx_time;
-uint64_t minimum_pause;
+// New packet length
+const size_t LORA_PAYLOAD_LEN = 22;
 
-// Shared state for the web page
-volatile long   rxCount   = 0;
-String          lastPacket = "(none)";
-float           lastRSSI  = 0;
-float           lastSNR   = 0;
+// --------------------------------------------------
+// Sensor Data Structure
+// --------------------------------------------------
 
-WebServer server(80);
+struct SensorData {
+    uint16_t scdCO2;
+    int16_t  scdTemp;        // x100
+    int16_t  scdHumidity;    // x100
 
-void handleRoot() {
-  String html = "<!DOCTYPE html><html><head>"
-                "<meta name='viewport' content='width=device-width,initial-scale=1'>"
-                "<meta http-equiv='refresh' content='5'>"
-                "<title>Heltec Base</title></head><body>"
-                "<h1>Hello World</h1>"
-                "<p>Packets received: " + String(rxCount) + "</p>"
-                "<p>Last packet: " + lastPacket + "</p>"
-                "<p>RSSI: " + String(lastRSSI, 2) + " dBm</p>"
-                "<p>SNR: " + String(lastSNR, 2) + " dB</p>"
-                "</body></html>";
-  server.send(200, "text/html", html);
+    uint16_t bmeCO2eq;
+    uint16_t bmeVOC;         // x100
+    int16_t  bmeHumidity;    // x100
+    int16_t  bmeTemp;        // x100
+    uint16_t bmePressure;    // x10 (hPa)
+    uint16_t  bmeStability;
+
+    uint16_t adcVoltage;     // mV
+    uint16_t  deviceID;
+};
+
+SensorData sensors = {};
+
+// Receive flag
+volatile bool packetReceived = false;
+
+// --------------------------------------------------
+// Helper Functions
+// --------------------------------------------------
+
+uint16_t readUInt16(const uint8_t* data) {
+    return (uint16_t)data[0] | ((uint16_t)data[1] << 8);
 }
+
+int16_t readInt16(const uint8_t* data) {
+    return (int16_t)readUInt16(data);
+}
+
+void decodePacket(const uint8_t* payload, SensorData& data) {
+    data.scdCO2       = readUInt16(&payload[0]);
+    data.scdTemp      = readInt16(&payload[2]);
+    data.scdHumidity  = readInt16(&payload[4]);
+
+    data.bmeCO2eq     = readUInt16(&payload[6]);
+    data.bmeVOC       = readUInt16(&payload[8]);
+    data.bmeHumidity  = readInt16(&payload[10]);
+    data.bmeTemp      = readInt16(&payload[12]);
+    data.bmePressure  = readUInt16(&payload[14]);
+    data.bmeStability = readUInt16(&payload[16]);
+
+    data.adcVoltage   = readUInt16(&payload[18]);
+    data.deviceID     = readUInt16(&payload[20]);
+}
+
+// --------------------------------------------------
+// Interrupt Handler
+// --------------------------------------------------
+
+#if defined(ESP8266) || defined(ESP32)
+ICACHE_RAM_ATTR
+#endif
+void onPacketReceived() {
+    packetReceived = true;
+}
+
+// --------------------------------------------------
+// Setup
+// --------------------------------------------------
 
 void setup() {
-  heltec_ve(true);
-  delay(100);
-  heltec_display_power(true);
-  heltec_setup();
+    Serial.begin(SERIAL_BAUD);
+    while (!Serial);
 
-  both.println("Radio init");
-  RADIOLIB_OR_HALT(radio.begin());
-  radio.setDio1Action(rx);
-  both.printf("Frequency: %.2f MHz\n", FREQUENCY);
-  RADIOLIB_OR_HALT(radio.setFrequency(FREQUENCY));
-  both.printf("Bandwidth: %.1f kHz\n", BANDWIDTH);
-  RADIOLIB_OR_HALT(radio.setBandwidth(BANDWIDTH));
-  both.printf("Spreading Factor: %i\n", SPREADING_FACTOR);
-  RADIOLIB_OR_HALT(radio.setSpreadingFactor(SPREADING_FACTOR));
-  both.printf("TX power: %i dBm\n", TRANSMIT_POWER);
-  RADIOLIB_OR_HALT(radio.setOutputPower(TRANSMIT_POWER));
-  RADIOLIB_OR_HALT(radio.startReceive(RADIOLIB_SX126X_RX_TIMEOUT_INF));
+    pinMode(LED_PIN, OUTPUT);
+    digitalWrite(LED_PIN, LOW);
 
-  // --- WiFi AP ---
-  WiFi.mode(WIFI_AP);
-  WiFi.softAP(AP_SSID, AP_PASS);
-  IPAddress ip = WiFi.softAPIP();
-  both.printf("AP: %s\n", AP_SSID);
-  both.printf("IP: %s\n", ip.toString().c_str());
+    Serial.println("LoRa Gateway Starting...");
 
-  server.on("/", handleRoot);
-  server.begin();
-  both.println("HTTP up");
+    int state = radio.begin(
+        LORA_FREQ_MHZ,
+        LORA_BW_KHZ,
+        LORA_SF,
+        LORA_CR,
+        LORA_SYNC_WORD,
+        LORA_POWER_DBM,
+        LORA_CURRENT_MA
+    );
+
+    if (state == RADIOLIB_ERR_NONE) {
+        Serial.println("SX1262 initialized successfully.");
+    } else {
+        Serial.print("Failed to initialize radio. Error: ");
+        Serial.println(state);
+        while (true);
+    }
+
+    radio.setDio1Action(onPacketReceived);
+
+    state = radio.startReceive();
+
+    if (state == RADIOLIB_ERR_NONE) {
+        Serial.println("Gateway Ready - Listening");
+    } else {
+        Serial.print("startReceive failed, code: ");
+        Serial.println(state);
+    }
 }
+
+// --------------------------------------------------
+// Main Loop
+// --------------------------------------------------
 
 void loop() {
-  heltec_loop();
-  server.handleClient();          // must be called often
 
-  bool tx_legal = millis() > last_tx + minimum_pause;
-  if ((PAUSE && tx_legal && millis() - last_tx > (PAUSE * 1000)) || button.isSingleClick()) {
-    if (!tx_legal) {
-      both.printf("Legal limit, wait %i sec.\n",
-                  (int)((minimum_pause - (millis() - last_tx)) / 1000) + 1);
-      return;
-    }
-    both.printf("TX [%s] ", String(counter).c_str());
-    radio.clearDio1Action();
-    heltec_led(50);
-    tx_time = millis();
-    RADIOLIB(radio.transmit(String(counter++).c_str()));
-    tx_time = millis() - tx_time;
-    heltec_led(0);
-    if (_radiolib_status == RADIOLIB_ERR_NONE) {
-      both.printf("OK (%i ms)\n", (int)tx_time);
-    } else {
-      both.printf("fail (%i)\n", _radiolib_status);
-    }
-    minimum_pause = tx_time * 100;
-    last_tx = millis();
-    radio.setDio1Action(rx);
-    RADIOLIB_OR_HALT(radio.startReceive(RADIOLIB_SX126X_RX_TIMEOUT_INF));
-  }
+    if (!packetReceived)
+        return;
 
-  if (rxFlag) {
-    rxFlag = false;
-    radio.readData(rxdata);
-    if (_radiolib_status == RADIOLIB_ERR_NONE) {
-      lastPacket = rxdata;
-      lastRSSI   = radio.getRSSI();
-      lastSNR    = radio.getSNR();
-      rxCount++;
-      both.printf("RX [%s]\n", rxdata.c_str());
-      both.printf("  RSSI: %.2f dBm\n", lastRSSI);
-      both.printf("  SNR: %.2f dB\n", lastSNR);
-    }
-    RADIOLIB_OR_HALT(radio.startReceive(RADIOLIB_SX126X_RX_TIMEOUT_INF));
-  }
-}
+    packetReceived = false;
 
-void rx() {
-  rxFlag = true;
+    uint8_t buffer[LORA_PAYLOAD_LEN] = {0};
+
+    int status = radio.readData(buffer, LORA_PAYLOAD_LEN);
+
+    if (status == RADIOLIB_ERR_NONE) {
+
+        decodePacket(buffer, sensors);
+
+        float rssi = radio.getRSSI();
+        float snr  = radio.getSNR();
+
+        // Blink LED
+        digitalWrite(LED_PIN, HIGH);
+        delay(50);
+        digitalWrite(LED_PIN, LOW);
+
+        // CSV output
+        Serial.printf(
+            "%u,%.2f,%.2f,%u,%.2f,%.2f,%.2f,%.1f,%u,%.2f,%.1f,%.1f,%u\n",
+            sensors.scdCO2,
+            sensors.scdTemp / 100.0f,
+            sensors.scdHumidity / 100.0f,
+            sensors.bmeCO2eq,
+            sensors.bmeVOC / 100.0f,
+            sensors.bmeHumidity / 100.0f,
+            sensors.bmeTemp / 100.0f,
+            sensors.bmePressure / 10.0f,
+            sensors.bmeStability,
+            sensors.adcVoltage / 100.0f,
+            rssi,
+            snr,
+            sensors.deviceID
+        );
+
+    }
+    else if (status == RADIOLIB_ERR_CRC_MISMATCH) {
+        Serial.println("CRC Error - Corrupted packet");
+    }
+    else {
+        Serial.print("Read failed, code: ");
+        Serial.println(status);
+    }
+
+    // Resume listening
+    radio.startReceive();
 }
