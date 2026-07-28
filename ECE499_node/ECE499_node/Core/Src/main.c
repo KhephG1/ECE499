@@ -53,9 +53,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define TIMER_ARR_15SECONDS      (61440) //(32.768kHz / 8) / 61440 gives a 15.3 second period
-#define TIMER_ARR_5SECONDS    (20480)
 #define SENSOR_WAIT_TIMEOUT_MS (200)
+#define LPTIM_PERIOD (5000)
 #define PAYLOAD_LEN           (LORA_LINK_PAYLOAD_LEN)
 #define ADC_CODE_MAX (1 << 14)
 #define NODE_ID (2) 
@@ -222,6 +221,8 @@ bsec_output_t bme680_data[6] = {};
 float battery_voltage = 0.0f;
 #define BME680_MAX_OUTPUTS ((uint8_t)(sizeof(bme680_data) / sizeof(bme680_data[0])))
 uint8_t noutputs = BME680_MAX_OUTPUTS;
+uint64_t tick_count = 0;
+uint8_t bme_noutputs = 0;
 // Packs the latest SCD40 + BME680/BSEC readings into the fixed little-endian
 // payload described by shared/lora_link.h. The gateway decodes it from those
 // same offsets, so the layout is defined there rather than here.
@@ -406,6 +407,7 @@ int main(void)
   HAL_ADCEx_Calibration_Start(&hadc1,ADC_CALIB_OFFSET,ADC_SINGLE_ENDED );
   __HAL_RCC_LPTIM1_CLK_SLEEP_ENABLE();
   __HAL_RCC_LPTIM1_CLKAM_ENABLE();
+  tick_count = HAL_GetTick();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -415,12 +417,12 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-   uint8_t bme_noutputs = 0;
+    tick_count += LPTIM_PERIOD;
     // BSEC reads noutputs as the capacity of bme680_data on the way in and
     // overwrites it with the number of outputs it produced, so it has to be
     // reset before every call or the capacity ratchets down.
     noutputs = BME680_MAX_OUTPUTS;
-    if (bme680_step(&bme680, bme680_data, &noutputs) == BME68X_OK)
+    if (bme680_step(&bme680, bme680_data, &noutputs, tick_count) == BME68X_OK)
     {
         bme_noutputs = noutputs;
     }

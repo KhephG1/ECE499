@@ -41,7 +41,8 @@ static struct bme68x_heatr_conf heatr_conf = {
     .heatr_temp = BME68X_LOW_TEMP,
     .profile_len = BME68X_PROFILE_LEN,
     .heatr_temp_prof = heater_temp_prof,
-    .heatr_dur_prof = heater_dur_prof
+    .heatr_dur_prof = heater_dur_prof,
+    .enable = BME68X_ENABLE
 };
 static struct bme68x_data bme_data = {};
 
@@ -214,10 +215,10 @@ int8_t bme680_init(struct bme68x_dev *bme, uint8_t intf){
 }
 
 
-int8_t bme680_step(struct bme68x_dev* dev, bsec_output_t* outputs, uint8_t* n_outputs){
+int8_t bme680_step(struct bme68x_dev* dev, bsec_output_t* outputs, uint8_t* n_outputs, int64_t ticks){
     bsec_bme_settings_t sensor_settings;
     uint8_t ndata = 1;
-    int64_t time_stamp = (int64_t)HAL_GetTick() * MS_TO_NS;
+    int64_t time_stamp = (int64_t)ticks * MS_TO_NS;
     bme68x_get_op_mode(&bme_current_op_mode, dev);
     bsec_sensor_control(time_stamp, &sensor_settings);
     if(sensor_settings.op_mode != bme_current_op_mode){
@@ -235,7 +236,7 @@ int8_t bme680_step(struct bme68x_dev* dev, bsec_output_t* outputs, uint8_t* n_ou
        }
     }
     if(sensor_settings.process_data != 0){
-        int64_t timestamp = HAL_GetTick() * MS_TO_NS;
+        int64_t timestamp = (int64_t)ticks * MS_TO_NS;
         bsec_input_t inputs[4] = {
             [0] = {
                 .sensor_id = BSEC_INPUT_TEMPERATURE,
