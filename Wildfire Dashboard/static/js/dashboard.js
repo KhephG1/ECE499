@@ -833,9 +833,6 @@ async function loadNodes() {
             await response.json();
 
 
-
-
-
         updateMarkers();
 
 
