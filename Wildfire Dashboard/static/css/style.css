@@ -499,11 +499,13 @@ body {
 
     flex: 2;
 
-    background: #111827;
-
-    color: white;
+    background: white;
 
     padding: 15px;
+
+    border-left: 1px solid #ccc;
+
+    overflow-y: auto;
 
 }
 
@@ -529,11 +531,13 @@ body {
 
     gap: 15px;
 
-    background: #1f2933;
+    background: #fafafa;
 
     padding: 15px;
 
-    border-radius: 8px;
+    border-radius: 10px;
+
+    border: 1px solid #ddd;
 
 }
 
@@ -619,7 +623,7 @@ body {
 
 .form-status.success {
 
-    color: #4ade80;
+    color: #15803d;
 
 }
 
@@ -627,7 +631,109 @@ body {
 
 .form-status.error {
 
-    color: #f87171;
+    color: #b91c1c;
+
+}
+
+
+
+
+
+/* ================================
+   PARAMETER GRAPH
+================================ */
+
+
+.parameter-panel {
+
+    display: flex;
+
+    gap: 15px;
+
+    margin-top: 15px;
+
+}
+
+
+
+
+.parameter-controls {
+
+    flex: 0 0 180px;
+
+}
+
+
+
+.parameter-controls label {
+
+    display: block;
+
+    margin-bottom: 6px;
+
+    font-weight: bold;
+
+    font-size: 14px;
+
+}
+
+
+
+.parameter-controls select {
+
+    width: 100%;
+
+    padding: 10px;
+
+    border-radius: 8px;
+
+    border: 1px solid #ccc;
+
+    font-size: 15px;
+
+}
+
+
+
+
+.parameter-hint {
+
+    margin: 10px 0 0 0;
+
+    font-size: 13px;
+
+    color: #6b7280;
+
+}
+
+
+
+
+.parameter-chart-card {
+
+    flex: 1;
+
+    min-width: 0;
+
+    height: 260px;
+
+    background: #fafafa;
+
+    padding: 15px;
+
+    border-radius: 10px;
+
+    border: 1px solid #ddd;
+
+}
+
+
+
+.parameter-chart-card canvas {
+
+    width: 100% !important;
+
+    height: 100% !important;
 
 }
 
@@ -842,6 +948,22 @@ body {
     }
 
 
+
+    .parameter-panel {
+
+        flex-direction: column;
+
+    }
+
+
+
+    .parameter-controls {
+
+        flex: 1;
+
+    }
+
+
 }
 
 /* ================================
@@ -891,5 +1013,78 @@ body {
     width: auto;
 
     padding: 12px 24px;
+
+}
+
+
+
+.toolbar-actions {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 12px;
+
+}
+
+
+
+
+
+/* ================================
+   EXPORT BUTTON
+================================ */
+
+
+.export-button {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    gap: 8px;
+
+    padding: 12px 20px;
+
+    background: #15803d;
+
+    color: white;
+
+    border: none;
+
+    border-radius: 8px;
+
+    font-size: 16px;
+
+    cursor: pointer;
+
+}
+
+
+
+.export-button:hover {
+
+    background: #166534;
+
+}
+
+
+
+.export-icon {
+
+    width: 20px;
+
+    height: 20px;
+
+    fill: none;
+
+    stroke: currentColor;
+
+    stroke-width: 1.8;
+
+    stroke-linecap: round;
+
+    stroke-linejoin: round;
 
 }

@@ -1,4 +1,10 @@
-from flask import Flask, render_template, jsonify, request
+import csv
+import io
+import re
+
+from datetime import datetime
+
+from flask import Flask, render_template, jsonify, request, Response
 
 from dashboard.nodes import get_nodes
 
@@ -299,6 +305,170 @@ def api_history(device_id):
 
 
     return jsonify(history)
+
+
+
+
+
+
+
+
+
+# ===================================
+# HISTORICAL DATA EXPORT
+# ===================================
+
+
+@app.route("/api/history/<device_id>/export")
+def api_history_export(device_id):
+
+
+    history_range = request.args.get(
+
+        "range",
+
+        "24h"
+
+    )
+
+
+    rows = get_sensor_history(
+
+        device_id,
+
+        history_range
+
+    )
+
+
+
+
+    # ===============================
+    # BUILD THE SPREADSHEET
+    # ===============================
+
+    columns = [
+
+        "timestamp",
+
+        "device_id",
+
+        "temperature",
+        "humidity",
+        "co2",
+        "voc",
+        "pressure",
+
+        "battery_voltage",
+        "battery_percentage",
+
+        "rssi",
+        "snr",
+
+        "fire_score",
+        "fire_risk"
+
+    ]
+
+
+
+    headers = [
+
+        "Timestamp",
+
+        "Device ID",
+
+        "Temperature (C)",
+        "Humidity (%)",
+        "CO2 (ppm)",
+        "VOC (ppb)",
+        "Pressure (hPa)",
+
+        "Battery Voltage (V)",
+        "Battery (%)",
+
+        "RSSI (dBm)",
+        "SNR (dB)",
+
+        "Fire Score",
+        "Fire Risk"
+
+    ]
+
+
+
+    buffer = io.StringIO()
+
+    writer = csv.writer(buffer)
+
+
+    writer.writerow(headers)
+
+
+
+    for row in rows:
+
+
+        writer.writerow([
+
+            row[column]
+
+            for column in columns
+
+        ])
+
+
+
+
+    # ===============================
+    # SEND AS A DOWNLOAD
+    # ===============================
+
+    stamp = datetime.now().strftime(
+        "%Y%m%d-%H%M%S"
+    )
+
+
+    # Keep anything odd in the id out of the header
+
+    safe_id = re.sub(
+        r"[^A-Za-z0-9_-]",
+        "",
+        device_id
+    )
+
+
+    filename = (
+
+        f"WF-{safe_id}"
+
+        f"_history_{history_range}"
+
+        f"_{stamp}.csv"
+
+    )
+
+
+
+    return Response(
+
+        # Excel needs the BOM to read UTF-8
+
+        "﻿" + buffer.getvalue(),
+
+
+        mimetype="text/csv",
+
+
+        headers={
+
+            "Content-Disposition":
+
+                f'attachment; filename="{filename}"'
+
+        }
+
+    )
 
 
 

@@ -169,6 +169,13 @@ def get_nodes():
                 time_since(age),
 
 
+            # Clock time the reading was
+            # recorded, "%Y-%m-%d %H:%M:%S"
+
+            "timestamp":
+                row["timestamp"],
+
+
             "seconds_since_update":
                 int(age),
 

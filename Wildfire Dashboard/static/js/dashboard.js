@@ -23,6 +23,22 @@ let co2Chart = null;
 let batteryChart = null;
 
 
+// Parameter graph on the dashboard page
+
+let parameterChart = null;
+
+
+// What the parameter graph is currently
+// showing, so the 1 second poll only
+// rebuilds it when something changed.
+// Left undefined so the first poll always
+// draws, even with no node selected
+
+let parameterChartNode;
+
+let parameterChartTimestamp;
+
+
 
 
 
@@ -157,6 +173,91 @@ function riskClass(risk) {
 
 
     return "";
+
+}
+
+
+
+
+
+
+
+
+
+// ===================================
+// TIME HELPERS
+// ===================================
+
+
+// Database timestamps are local clock
+// time, "YYYY-MM-DD HH:MM:SS"
+
+function formatTimestamp(timestamp) {
+
+
+    if(!timestamp) {
+
+        return "--";
+
+    }
+
+
+
+    let parsed =
+        new Date(
+            timestamp.replace(" ", "T")
+        );
+
+
+
+    if(isNaN(parsed)) {
+
+        return timestamp;
+
+    }
+
+
+
+    return parsed.toLocaleTimeString();
+
+}
+
+
+
+
+
+// Timestamp of the most recent reading
+// received from any node
+
+function latestReadingTime() {
+
+
+    let latest = null;
+
+
+
+    nodes.forEach(node => {
+
+
+        if(!node.timestamp) {
+
+            return;
+
+        }
+
+
+        if(latest === null || node.timestamp > latest) {
+
+            latest = node.timestamp;
+
+        }
+
+
+    });
+
+
+
+    return latest;
 
 }
 
@@ -517,7 +618,9 @@ function updateStatusBar() {
 
 
     document.getElementById("system-update").innerHTML =
-        new Date().toLocaleTimeString();
+        formatTimestamp(
+            latestReadingTime()
+        );
 
 
 }
@@ -784,6 +887,10 @@ async function loadNodes() {
 
 
         }
+
+
+
+        refreshParameterChart();
 
 
     }
@@ -1056,6 +1163,237 @@ async function submitNodeLocation(event) {
 
 
 // ===================================
+// PARAMETER GRAPH
+// ===================================
+
+
+// Logged parameters, keyed by the field
+// name used by /api/history
+
+const PARAMETER_LABELS = {
+
+    temperature: "Temperature (°C)",
+
+    humidity: "Humidity (%)",
+
+    voc: "VOC (ppb)",
+
+    co2: "CO₂ (ppm)",
+
+    battery: "Battery (%)"
+
+};
+
+
+
+
+
+function setParameterHint(message) {
+
+
+    document.getElementById(
+        "parameter-hint"
+    ).innerHTML = message;
+
+
+}
+
+
+
+
+
+// Rebuilds the graph from scratch. Called
+// when the user picks a parameter, and by
+// refreshParameterChart() once the data
+// behind it has moved on.
+
+async function updateParameterChart() {
+
+
+    if(parameterChart) {
+
+        parameterChart.destroy();
+
+        parameterChart = null;
+
+    }
+
+
+
+
+    if(!selectedNode) {
+
+
+        parameterChartNode = null;
+
+        parameterChartTimestamp = null;
+
+
+        setParameterHint(
+            "Select a node to see its data."
+        );
+
+
+        return;
+
+    }
+
+
+
+
+    let parameter =
+        document.getElementById(
+            "parameter-select"
+        ).value;
+
+
+
+    // Remember what is on screen before the
+    // request, so a slow response cannot be
+    // mistaken for a stale graph
+
+    parameterChartNode =
+        selectedNode.device_id;
+
+    parameterChartTimestamp =
+        selectedNode.timestamp;
+
+
+
+
+    try {
+
+
+        let response = await fetch(
+
+            "/api/history/" +
+
+            encodeURIComponent(selectedNode.device_id) +
+
+            "?range=24h"
+
+        );
+
+
+        let data = await response.json();
+
+
+
+
+        if(data.timestamps.length === 0) {
+
+
+            setParameterHint(
+                "No readings in the last 24 hours."
+            );
+
+
+            return;
+
+        }
+
+
+
+
+        parameterChart = createChart(
+
+            "parameter-chart",
+
+            PARAMETER_LABELS[parameter],
+
+            {
+
+                time: data.timestamps,
+
+                data: data[parameter]
+
+            }
+
+        );
+
+
+
+        setParameterHint(
+            "WF-" +
+            selectedNode.device_id +
+            ", last 24 hours"
+        );
+
+
+    }
+
+
+    catch(error) {
+
+
+        console.error(error);
+
+
+        // Let the next poll try again
+
+        parameterChartTimestamp = null;
+
+
+        setParameterHint(
+            "Failed to load graph data."
+        );
+
+
+    }
+
+
+}
+
+
+
+
+
+// Called on every poll. Redraws only when
+// the selected node changed or that node
+// reported a new reading.
+
+function refreshParameterChart() {
+
+
+    let deviceId =
+        selectedNode ? selectedNode.device_id : null;
+
+
+    let timestamp =
+        selectedNode ? selectedNode.timestamp : null;
+
+
+
+    if(
+
+        deviceId === parameterChartNode
+
+        &&
+
+        timestamp === parameterChartTimestamp
+
+    ) {
+
+        return;
+
+    }
+
+
+
+    updateParameterChart();
+
+
+}
+
+
+
+
+
+
+
+
+
+// ===================================
 // HISTORICAL DATA
 // ===================================
 
@@ -1249,6 +1587,53 @@ async function createHistoricalCharts() {
 
 
 }
+
+
+
+
+
+
+
+
+// ===================================
+// HISTORICAL DATA EXPORT
+// ===================================
+
+
+function exportHistory() {
+
+
+    if(!selectedNode) {
+
+        return;
+
+    }
+
+
+
+    const historyRange = document.getElementById(
+        "history-range"
+    ).value;
+
+
+
+    // Letting the browser follow the link keeps
+    // the file out of memory and gives the user
+    // the normal download prompt
+
+    window.location.href =
+
+        "/api/history/" +
+
+        encodeURIComponent(selectedNode.device_id) +
+
+        "/export?range=" +
+
+        encodeURIComponent(historyRange);
+
+
+}
+
 
 
 
