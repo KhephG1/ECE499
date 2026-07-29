@@ -27,7 +27,7 @@
 #define LORA_LINK_FREQ_MHZ       915.0f
 
 #define LORA_LINK_BW_KHZ         125.0f
-#define LORA_LINK_SF             9
+#define LORA_LINK_SF             7
 #define LORA_LINK_CR_DENOM       7  /* coding rate 4/7 */
 #define LORA_LINK_PREAMBLE_SYMB  8
 

@@ -128,8 +128,12 @@ def parse_packet(packet):
                 float(values[5]),
 
 
+            # SCD40 measures CO2 directly.
+            # The BME680 only estimates an
+            # equivalent from VOC.
+
             "co2":
-                float(values[3]),
+                float(values[0]),
 
 
             "voc":

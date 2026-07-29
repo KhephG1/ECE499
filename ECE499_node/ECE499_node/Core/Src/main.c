@@ -104,7 +104,7 @@ static const void *radio_ctx = NULL;
 // The sx126x enums encode SF as its own numeric value and CR as (denominator -
 // 4), so the shared link constants can be checked against the enums the driver
 // actually wants at compile time rather than trusted to stay in step.
-_Static_assert(SX126X_LORA_SF9 == LORA_LINK_SF,
+_Static_assert(SX126X_LORA_SF7 == LORA_LINK_SF,
                "SF disagrees with shared/lora_link.h");
 _Static_assert(SX126X_LORA_CR_4_7 + 4 == LORA_LINK_CR_DENOM,
                "coding rate disagrees with shared/lora_link.h");
@@ -126,20 +126,19 @@ static bool radio_init(void)
     // Must stay in step with shared/lora_link.h; the _Static_asserts above
     // cover sf and cr, and BW_125 is the enum for LORA_LINK_BW_KHZ.
     const sx126x_mod_params_lora_t mod_params = {
-        .sf   = SX126X_LORA_SF9,
+        .sf   = SX126X_LORA_SF7,
         .bw   = SX126X_LORA_BW_125,
         .cr   = SX126X_LORA_CR_4_7,
         .ldro = 0,  // only needed when symbol time exceeds 16ms (SF11/SF12 at BW125)
     };
 
-    // +22dBm PA config for the SX1262, datasheet table 13-21. device_sel picks
-    // the SX1262's high-power PA over the SX1261's.
-    const sx126x_pa_cfg_params_t pa_cfg = {
-        .pa_duty_cycle = 0x04,
-        .hp_max        = 0x07,
-        .device_sel    = 0x00,
-        .pa_lut        = 0x01,
-    };
+//configure PA max for +14dbm
+const sx126x_pa_cfg_params_t pa_cfg = {
+  .pa_duty_cycle = 0x02,
+  .hp_max        = 0x02,
+  .device_sel    = 0x00,   // still the SX1262 PA
+  .pa_lut        = 0x01,
+};
 
     if (sx126x_reset(radio_ctx) != SX126X_STATUS_OK) return false;
     if (sx126x_set_standby(radio_ctx, SX126X_STANDBY_CFG_RC) != SX126X_STATUS_OK) return false;

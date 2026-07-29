@@ -20,6 +20,8 @@ let vocChart = null;
 
 let co2Chart = null;
 
+let pressureChart = null;
+
 let batteryChart = null;
 
 
@@ -349,6 +351,37 @@ function updatePanel(node) {
 
     badge.className =
         "risk-badge " + riskClass(status);
+
+
+
+
+    // The number behind the badge. Kept
+    // visible when the node is offline,
+    // like the other readings, but dimmed
+    // so a stale score is not mistaken
+    // for a current one.
+
+    let score =
+        document.getElementById("fire-score");
+
+
+    // Stored as REAL, but only ever built
+    // from whole numbers, so drop the ".0"
+
+    score.innerHTML =
+        "Fire Score <strong>" +
+        (
+            node.fire_score === null
+            ? "--"
+            : Math.round(node.fire_score)
+        ) +
+        "</strong>";
+
+
+    score.className =
+        node.online
+        ? "fire-score"
+        : "fire-score stale";
 
 
 }
@@ -1177,6 +1210,8 @@ const PARAMETER_LABELS = {
 
     co2: "CO₂ (ppm)",
 
+    pressure: "Pressure (hPa)",
+
     battery: "Battery (%)"
 
 };
@@ -1566,6 +1601,24 @@ async function createHistoricalCharts() {
 
 
 
+    pressureChart = createChart(
+
+        "pressure-chart",
+
+        "Pressure (hPa)",
+
+        {
+
+            time:data.timestamps,
+
+            data:data.pressure
+
+        }
+
+    );
+
+
+
     batteryChart = createChart(
 
         "battery-chart",
@@ -1714,6 +1767,11 @@ function destroyCharts() {
     if(co2Chart)
 
         co2Chart.destroy();
+
+
+    if(pressureChart)
+
+        pressureChart.destroy();
 
 
     if(batteryChart)

@@ -1,3 +1,4 @@
+import sys
 # ===================================
 # PROJECT CONFIGURATION
 # ===================================
@@ -18,7 +19,7 @@ DATABASE = "database/wildfire.db"
 # -----------------------------
 
 
-SERIAL_PORT = "COM4"
+SERIAL_PORT = sys.argv[1]
 
 BAUD_RATE = 115200
 

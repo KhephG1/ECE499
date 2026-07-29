@@ -47,17 +47,17 @@ def calculate_fire_risk(data):
     )
 
 
-    if temperature >= 40:
+    if temperature >= 45:
 
         score += 35
 
 
-    elif temperature >= 30:
+    elif temperature >= 40:
 
         score += 20
 
 
-    elif temperature >= 25:
+    elif temperature >= 30:
 
         score += 10
 
@@ -87,7 +87,8 @@ def calculate_fire_risk(data):
 
         score += 15
 
-
+    elif humidity >= 50:
+        score -= 30
 
 
 
@@ -104,12 +105,12 @@ def calculate_fire_risk(data):
     )
 
 
-    if voc >= 400:
+    if voc >= 0.85:
 
         score += 25
 
 
-    elif voc >= 200:
+    elif voc >= 0.75:
 
         score += 10
 
@@ -164,8 +165,7 @@ def calculate_fire_risk(data):
 
         risk = "Danger"
 
-
-
+    score = 0
 
 
     return {

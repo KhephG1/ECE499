@@ -21,7 +21,7 @@ SX1262 radio = new Module(PIN_NSS, PIN_DIO1, PIN_NRST, PIN_BUSY);
 // LoRa parameters (MUST match transmitter!)
 const float   LORA_FREQ_MHZ     = 915.0;
 const float   LORA_BW_KHZ       = 125.0;
-const uint8_t LORA_SF           = 9;
+const uint8_t LORA_SF           = 12;
 const uint8_t LORA_CR           = 7;      // 4/7
 const uint8_t LORA_SYNC_WORD    = 0x12;   // Private network
 const int8_t  LORA_POWER_DBM    = 10;

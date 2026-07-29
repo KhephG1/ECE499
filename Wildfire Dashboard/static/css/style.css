@@ -373,6 +373,50 @@ body {
 
 
 
+/* ================================
+   FIRE SCORE
+================================ */
+
+
+.fire-score {
+
+    margin-top: 10px;
+
+    font-size: 14px;
+
+    color: #666;
+
+}
+
+
+
+
+.fire-score strong {
+
+    font-size: 20px;
+
+    color: #222;
+
+    margin-left: 4px;
+
+}
+
+
+
+
+/* A node that has stopped reporting is
+   still showing its last known score */
+
+.fire-score.stale {
+
+    opacity: 0.5;
+
+}
+
+
+
+
+
 
 
 

@@ -248,6 +248,8 @@ def api_history(device_id):
 
         "co2": [],
 
+        "pressure": [],
+
         "battery": []
 
     }
@@ -290,6 +292,13 @@ def api_history(device_id):
         history["co2"].append(
 
             row["co2"]
+
+        )
+
+
+        history["pressure"].append(
+
+            row["pressure"]
 
         )
 
