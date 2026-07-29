@@ -57,7 +57,7 @@
 #define LPTIM_PERIOD (5000)
 #define PAYLOAD_LEN           (LORA_LINK_PAYLOAD_LEN)
 #define ADC_CODE_MAX (1 << 14)
-#define NODE_ID (2) 
+#define NODE_ID (3) 
 
 /*
  * Radio configuration.
