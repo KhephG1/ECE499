@@ -47,7 +47,7 @@ def add_device(
 
         """
 
-        INSERT OR REPLACE INTO devices
+        INSERT OR IGNORE INTO devices
 
         (
             device_id,
