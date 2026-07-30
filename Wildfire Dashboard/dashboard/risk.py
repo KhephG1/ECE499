@@ -138,8 +138,6 @@ def calculate_fire_risk(data):
 
         risk = "Danger"
 
-    score = 0
-
 
     return {
 
