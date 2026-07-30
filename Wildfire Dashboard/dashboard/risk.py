@@ -28,13 +28,7 @@ def calculate_fire_risk(data):
 
     """
 
-
-
     score = 0
-
-
-
-
 
     # ===================================
     # TEMPERATURE CONTRIBUTION
@@ -52,19 +46,14 @@ def calculate_fire_risk(data):
         score += 35
 
 
-    elif temperature >= 40:
+    elif temperature >= 35:
 
         score += 20
 
 
     elif temperature >= 30:
 
-        score += 10
-
-
-
-
-
+        score += 15
 
 
     # ===================================
@@ -83,16 +72,12 @@ def calculate_fire_risk(data):
         score += 30
 
 
-    elif humidity <= 40:
+    elif humidity <= 35:
 
         score += 15
 
     elif humidity >= 50:
         score -= 30
-
-
-
-
 
     # ===================================
     # VOC CONTRIBUTION
@@ -105,20 +90,14 @@ def calculate_fire_risk(data):
     )
 
 
-    if voc >= 0.85:
-
-        score += 25
-
-
-    elif voc >= 0.75:
+    if voc >= 1.0:
 
         score += 10
 
 
+    elif voc >= 0.85:
 
-
-
-
+        score += 5
 
     # ===================================
     # CO2 CONTRIBUTION
@@ -132,24 +111,18 @@ def calculate_fire_risk(data):
 
 
     if co2 >= 1200:
-
+        score += 25
+    elif co2 >= 1100:
         score += 20
-
-
+    elif co2 >= 1000:
+        score += 15
     elif co2 >= 800:
-
         score += 10
-
-
-
-
-
 
 
     # ===================================
     # DETERMINE RISK LEVEL
     # ===================================
-
 
     if score < 30:
 
